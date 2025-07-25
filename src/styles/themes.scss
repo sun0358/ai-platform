@@ -1,0 +1,106 @@
+// src/styles/themes.scss
+
+// 深色主题（默认）
+:root,
+html.dark {
+  // 背景色
+  --ai-bg-primary: rgba(37, 44, 51, 0.26);
+  --ai-bg-secondary: #7e1d4d;
+  --ai-bg-tertiary: #0c0c87;
+
+  // 文字颜色
+  --ai-text-primary: #ffffff;
+  --ai-text-secondary: #ffffff;
+  --ai-text-muted: #ffffff;
+
+  // 主题色
+  --ai-primary: #6366f1;
+  --ai-primary-hover: #818cf8;
+  --ai-accent: #14b8a6;
+  --ai-success: #10b981;
+  --ai-warning: #f59e0b;
+  --ai-error: #ef4444;
+
+  // 边框和分割线
+  --ai-border: rgba(188, 188, 204, 0.96);
+  --ai-border-light: rgba(188, 188, 204, 0.96);
+
+  // 卡片背景
+  --ai-card-bg: rgb(255, 255, 255);
+  --ai-card-bg-hover: rgba(255, 255, 255, 0.05);
+}
+
+// 浅色主题
+html.light {
+  // 背景色
+  --ai-bg-primary: #dfe6ed;
+  --ai-bg-secondary: #f8fafc;
+  --ai-bg-tertiary: #f1f5f9;
+
+  // 文字颜色
+  --ai-text-primary: #0c0c0c;
+  --ai-text-secondary: #0c0c0c;
+  --ai-text-muted: #0c0c0c;
+
+  // 主题色保持不变，但可能需要调整对比度
+  --ai-primary: #6366f1;
+  --ai-primary-hover: #4f46e5;
+  --ai-accent: #14b8a6;
+  --ai-success: #10b981;
+  --ai-warning: #f59e0b;
+  --ai-error: #ef4444;
+
+  // 边框和分割线
+  --ai-border: rgb(12, 12, 12);
+  --ai-border-light: rgb(12, 12, 12);
+
+  // 卡片背景
+  --ai-card-bg: rgba(0, 0, 0, 0.02);
+  --ai-card-bg-hover: rgba(0, 0, 0, 0.04);
+}
+
+// 全局主题切换样式
+body {
+  background-color: var(--ai-bg-primary);
+  color: var(--ai-text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+// Element Plus 组件主题适配
+html.light {
+  // 输入框
+  .el-input__wrapper {
+    background-color: var(--ai-bg-tertiary) !important;
+    border-color: var(--ai-border) !important;
+
+    .el-input__inner {
+      color: var(--ai-text-primary) !important;
+
+      &::placeholder {
+        color: var(--ai-text-muted) !important;
+      }
+    }
+  }
+
+  // 下拉菜单
+  .el-dropdown-menu {
+    background-color: var(--ai-bg-secondary) !important;
+    border-color: var(--ai-border) !important;
+
+    .el-dropdown-menu__item {
+      color: var(--ai-text-secondary) !important;
+
+      &:hover {
+        background-color: var(--ai-card-bg-hover) !important;
+        color: var(--ai-text-primary) !important;
+      }
+    }
+  }
+
+  // 按钮
+  .el-button--default {
+    background-color: var(--ai-bg-tertiary) !important;
+    border-color: var(--ai-border) !important;
+    color: var(--ai-text-primary) !important;
+  }
+}

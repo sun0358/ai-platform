@@ -1,0 +1,893 @@
+<template>
+  <div class="image-recognition-page ai-gradient-bg">
+    <div class="page-header">
+      <div class="header-content">
+        <h1 class="page-title">
+          <el-icon><PictureFilled /></el-icon>
+          智能图像识别
+        </h1>
+        <p class="page-subtitle">多模态AI图像理解与分类</p>
+      </div>
+      <div class="header-stats">
+        <div class="stat-item">
+          <span class="stat-value">1000+</span>
+          <span class="stat-label">识别类别</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value">99.5%</span>
+          <span class="stat-label">准确率</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 识别模式选择 -->
+    <div class="mode-selector">
+      <div
+          v-for="mode in recognitionModes"
+          :key="mode.id"
+          class="mode-card"
+          :class="{ active: selectedMode === mode.id }"
+          @click="selectedMode = mode.id"
+      >
+        <div class="mode-icon" :style="{ background: mode.gradient }">
+          <el-icon :size="32"><component :is="mode.icon" /></el-icon>
+        </div>
+        <h3>{{ mode.title }}</h3>
+        <p>{{ mode.description }}</p>
+      </div>
+    </div>
+
+    <!-- 主要识别区域 -->
+    <div class="recognition-area">
+      <el-row :gutter="24">
+        <el-col :span="14">
+          <AICard variant="glass" class="upload-card">
+            <template #header>
+              <h3>图像输入</h3>
+            </template>
+
+            <div class="image-input-area">
+              <!-- 拖拽上传区域 -->
+              <div
+                  v-if="!currentImage"
+                  class="drop-zone"
+                  @click="selectFile"
+                  @dragover.prevent
+                  @drop.prevent="handleDrop"
+              >
+                <div class="drop-content">
+                  <el-icon :size="80"><UploadFilled /></el-icon>
+                  <h4>拖拽图片到此处</h4>
+                  <p>或点击选择文件</p>
+                  <div class="supported-formats">
+                    <el-tag v-for="format in ['JPG', 'PNG', 'GIF', 'BMP']" :key="format">
+                      {{ format }}
+                    </el-tag>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 图片预览 -->
+              <div v-else class="image-display">
+                <img :src="currentImage" alt="待识别图像" />
+                <div class="image-actions">
+                  <el-button-group>
+                    <el-button :icon="ZoomIn" @click="zoomIn">放大</el-button>
+                    <el-button :icon="ZoomOut" @click="zoomOut">缩小</el-button>
+                    <el-button :icon="RefreshRight" @click="resetZoom">重置</el-button>
+                  </el-button-group>
+                  <el-button type="danger" :icon="Delete" @click="clearImage">
+                    清除
+                  </el-button>
+                </div>
+              </div>
+
+              <input
+                  ref="fileInput"
+                  type="file"
+                  accept="image/*"
+                  style="display: none"
+                  @change="handleFileSelect"
+              />
+            </div>
+
+            <!-- URL输入 -->
+            <div class="url-input">
+              <el-input
+                  v-model="imageUrl"
+                  placeholder="或输入图片URL"
+                  size="large"
+              >
+                <template #append>
+                  <el-button @click="loadFromUrl">加载</el-button>
+                </template>
+              </el-input>
+            </div>
+
+            <template #footer>
+              <el-button
+                  type="primary"
+                  size="large"
+                  :loading="recognizing"
+                  :disabled="!currentImage"
+                  @click="startRecognition"
+              >
+                <el-icon><MagicStick /></el-icon>
+                开始识别
+              </el-button>
+            </template>
+          </AICard>
+        </el-col>
+
+        <el-col :span="10">
+          <!-- 实时识别结果 -->
+          <AICard variant="gradient" class="results-card">
+            <template #header>
+              <h3>识别结果</h3>
+              <el-tag v-if="recognitionComplete" type="success">
+                完成
+              </el-tag>
+            </template>
+
+            <div v-if="!recognitionResults" class="empty-results">
+              <el-icon :size="60"><InfoFilled /></el-icon>
+              <p>等待图像识别...</p>
+            </div>
+
+            <div v-else class="recognition-results">
+              <!-- 主要识别结果 -->
+              <div class="primary-result">
+                <div class="result-header">
+                  <h4>主要识别</h4>
+                  <div class="confidence-badge">
+                    <animated-number :value="recognitionResults.primary.confidence" :decimals="1" />%
+                  </div>
+                </div>
+                <div class="result-content">
+                  <el-tag size="large" type="primary">
+                    {{ recognitionResults.primary.label }}
+                  </el-tag>
+                  <p class="result-description">
+                    {{ recognitionResults.primary.description }}
+                  </p>
+                </div>
+              </div>
+
+              <!-- 其他可能的结果 -->
+              <div class="alternative-results">
+                <h4>其他可能</h4>
+                <div class="alternatives-list">
+                  <div
+                      v-for="(alt, index) in recognitionResults.alternatives"
+                      :key="index"
+                      class="alternative-item"
+                  >
+                    <span class="alt-label">{{ alt.label }}</span>
+                    <el-progress
+                        :percentage="alt.confidence"
+                        :color="getConfidenceColor(alt.confidence)"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <!-- 图像属性 -->
+              <div class="image-attributes">
+                <h4>图像属性</h4>
+                <div class="attributes-grid">
+                  <div
+                      v-for="attr in recognitionResults.attributes"
+                      :key="attr.name"
+                      class="attribute-item"
+                  >
+                    <el-icon><component :is="attr.icon" /></el-icon>
+                    <span class="attr-name">{{ attr.name }}</span>
+                    <span class="attr-value">{{ attr.value }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </AICard>
+
+          <!-- 识别历史 -->
+          <AICard variant="glass" class="history-card">
+            <template #header>
+              <h4>最近识别</h4>
+              <el-button text size="small" @click="clearHistory">清空</el-button>
+            </template>
+
+            <div class="history-list">
+              <div
+                  v-for="item in recentHistory"
+                  :key="item.id"
+                  class="history-item"
+                  @click="loadHistoryItem(item)"
+              >
+                <img :src="item.thumbnail" :alt="item.label" />
+                <div class="history-info">
+                  <span class="history-label">{{ item.label }}</span>
+                  <span class="history-time">{{ formatTime(item.timestamp) }}</span>
+                </div>
+              </div>
+            </div>
+
+            <el-empty v-if="recentHistory.length === 0" description="暂无历史" />
+          </AICard>
+        </el-col>
+      </el-row>
+    </div>
+
+    <!-- 高级功能区 -->
+    <div class="advanced-features">
+      <AICard variant="glass">
+        <template #header>
+          <h3>高级功能</h3>
+        </template>
+
+        <el-tabs v-model="activeTab">
+          <el-tab-pane label="批量识别" name="batch">
+            <div class="batch-upload">
+              <el-upload
+                  drag
+                  multiple
+                  :auto-upload="false"
+                  accept="image/*"
+                  :file-list="batchFiles"
+                  @change="handleBatchChange"
+              >
+                <el-icon :size="60"><UploadFilled /></el-icon>
+                <div class="el-upload__text">
+                  拖拽多个文件到此处或<em>点击上传</em>
+                </div>
+              </el-upload>
+              <el-button
+                  v-if="batchFiles.length > 0"
+                  type="primary"
+                  @click="startBatchRecognition"
+              >
+                批量识别 ({{ batchFiles.length }} 个文件)
+              </el-button>
+            </div>
+          </el-tab-pane>
+
+          <el-tab-pane label="相似图搜索" name="similar">
+            <div class="similar-search">
+              <p>基于当前图像搜索相似内容</p>
+              <el-button :disabled="!currentImage" @click="searchSimilar">
+                <el-icon><Search /></el-icon>
+                搜索相似图片
+              </el-button>
+            </div>
+          </el-tab-pane>
+
+          <el-tab-pane label="API集成" name="api">
+            <div class="api-integration">
+              <el-alert type="info" :closable="false">
+                使用我们的API将图像识别功能集成到您的应用中
+              </el-alert>
+              <el-button @click="showApiDocs">
+                <el-icon><Document /></el-icon>
+                查看API文档
+              </el-button>
+            </div>
+          </el-tab-pane>
+        </el-tabs>
+      </AICard>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref } from 'vue'
+import { ElMessage } from 'element-plus'
+import {
+  PictureFilled, UploadFilled, Delete, MagicStick, ZoomIn, ZoomOut,
+  RefreshRight, InfoFilled, Search, Document, Picture, Box, View, Brush
+} from '@element-plus/icons-vue'
+import AICard from '@/modules/common/components/AICard.vue'
+import AnimatedNumber from '@/modules/common/components/AnimatedNumber.vue'
+
+// 响应式数据
+const selectedMode = ref('general')
+const currentImage = ref('')
+const imageUrl = ref('')
+const fileInput = ref<HTMLInputElement>()
+const recognizing = ref(false)
+const recognitionComplete = ref(false)
+const recognitionResults = ref<any>(null)
+const activeTab = ref('batch')
+const batchFiles = ref<any[]>([])
+const recentHistory = ref<any[]>([])
+
+// 识别模式
+const recognitionModes = [
+  {
+    id: 'general',
+    title: '通用识别',
+    description: '识别日常物体、场景和概念',
+    icon: 'Picture',
+    gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+  },
+  {
+    id: 'ocr',
+    title: '文字识别',
+    description: '提取图片中的文字内容',
+    icon: 'Document',
+    gradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)'
+  },
+  {
+    id: 'face',
+    title: '人脸识别',
+    description: '检测和识别人脸特征',
+    icon: 'User',
+    gradient: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)'
+  },
+  {
+    id: 'art',
+    title: '艺术风格',
+    description: '分析艺术作品风格和流派',
+    icon: 'Brush',
+    gradient: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)'
+  }
+]
+
+// 方法
+const selectFile = () => {
+  fileInput.value?.click()
+}
+
+const handleFileSelect = (e: Event) => {
+  const target = e.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (file) {
+    loadFile(file)
+  }
+}
+
+const handleDrop = (e: DragEvent) => {
+  const file = e.dataTransfer?.files[0]
+  if (file && file.type.startsWith('image/')) {
+    loadFile(file)
+  }
+}
+
+const loadFile = (file: File) => {
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    currentImage.value = e.target?.result as string
+    recognitionResults.value = null
+    recognitionComplete.value = false
+  }
+  reader.readAsDataURL(file)
+}
+
+const loadFromUrl = () => {
+  if (imageUrl.value) {
+    currentImage.value = imageUrl.value
+    recognitionResults.value = null
+    recognitionComplete.value = false
+  }
+}
+
+const clearImage = () => {
+  currentImage.value = ''
+  recognitionResults.value = null
+  recognitionComplete.value = false
+}
+
+const startRecognition = async () => {
+  recognizing.value = true
+
+  // 模拟识别过程
+  setTimeout(() => {
+    recognitionResults.value = {
+      primary: {
+        label: '金毛寻回犬',
+        confidence: 95.8,
+        description: '一种大型犬种，性格友善，常用作导盲犬和搜救犬。'
+      },
+      alternatives: [
+        { label: '拉布拉多犬', confidence: 78.3 },
+        { label: '柴犬', confidence: 45.2 },
+        { label: '哈士奇', confidence: 23.1 }
+      ],
+      attributes: [
+        { name: '颜色', value: '金色', icon: 'Brush' },
+        { name: '场景', value: '户外', icon: 'Picture' },
+        { name: '情绪', value: '友好', icon: 'Star' },
+        { name: '品种', value: '纯种', icon: 'Trophy' }
+      ]
+    }
+
+    // 添加到历史
+    recentHistory.value.unshift({
+      id: Date.now(),
+      thumbnail: currentImage.value,
+      label: recognitionResults.value.primary.label,
+      timestamp: new Date()
+    })
+
+    recognizing.value = false
+    recognitionComplete.value = true
+    ElMessage.success('识别完成！')
+  }, 2000)
+}
+
+const getConfidenceColor = (confidence: number) => {
+  if (confidence >= 80) return '#10b981'
+  if (confidence >= 60) return '#f59e0b'
+  return '#ef4444'
+}
+
+const zoomIn = () => {
+  ElMessage.info('放大图片')
+}
+
+const zoomOut = () => {
+  ElMessage.info('缩小图片')
+}
+
+const resetZoom = () => {
+  ElMessage.info('重置缩放')
+}
+
+const handleBatchChange = (file: any, fileList: any) => {
+  batchFiles.value = fileList
+}
+
+const startBatchRecognition = () => {
+  ElMessage.success(`开始批量识别 ${batchFiles.value.length} 个文件`)
+}
+
+const searchSimilar = () => {
+  ElMessage.info('搜索相似图片')
+}
+
+const showApiDocs = () => {
+  ElMessage.info('打开API文档')
+}
+
+const clearHistory = () => {
+  recentHistory.value = []
+  ElMessage.success('历史已清空')
+}
+
+const loadHistoryItem = (item: any) => {
+  currentImage.value = item.thumbnail
+  ElMessage.info(`加载历史图片: ${item.label}`)
+}
+
+const formatTime = (date: Date) => {
+  return new Intl.DateTimeFormat('zh-CN', {
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(date)
+}
+</script>
+
+<style lang="scss" scoped>
+@use '@/styles/ai-theme.scss';
+
+.image-recognition-page {
+  min-height: 100vh;
+  padding: 20px;
+  background-color: var(--ai-bg-primary);
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+  padding: 24px;
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  border: 1px solid var(--ai-border);
+
+  .header-content {
+    .page-title {
+      margin: 0;
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--ai-text-primary);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+
+      .el-icon {
+        color: var(--ai-primary);
+      }
+    }
+
+    .page-subtitle {
+      margin: 8px 0 0 0;
+      font-size: 16px;
+      color: var(--ai-text-secondary);
+    }
+  }
+
+  .header-stats {
+    display: flex;
+    gap: 32px;
+
+    .stat-item {
+      text-align: center;
+
+      .stat-value {
+        display: block;
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--ai-primary);
+      }
+
+      .stat-label {
+        font-size: 14px;
+        color: var(--ai-text-muted);
+      }
+    }
+  }
+}
+
+.mode-selector {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+  margin-bottom: 32px;
+
+  .mode-card {
+    background: var(--ai-card-bg);
+    border: 2px solid var(--ai-border);
+    border-radius: 16px;
+    padding: 24px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: center;
+
+    &:hover {
+      transform: translateY(-4px);
+      border-color: var(--ai-primary);
+    }
+
+    &.active {
+      border-color: var(--ai-primary);
+      background: rgba(99, 102, 241, 0.1);
+    }
+
+    .mode-icon {
+      width: 64px;
+      height: 64px;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      margin: 0 auto 16px;
+    }
+
+    h3 {
+      margin: 0 0 8px 0;
+      color: var(--ai-text-primary);
+    }
+
+    p {
+      margin: 0;
+      font-size: 14px;
+      color: var(--ai-text-secondary);
+    }
+  }
+}
+
+.recognition-area {
+  margin-bottom: 32px;
+
+  .upload-card {
+    height: 100%;
+
+    .image-input-area {
+      margin-bottom: 16px;
+
+      .drop-zone {
+        min-height: 400px;
+        background: var(--ai-bg-tertiary);
+        border: 2px dashed var(--ai-border);
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+
+        &:hover {
+          border-color: var(--ai-primary);
+          background: var(--ai-card-bg-hover);
+        }
+
+        .drop-content {
+          text-align: center;
+
+          .el-icon {
+            color: var(--ai-primary);
+            margin-bottom: 16px;
+          }
+
+          h4 {
+            margin: 0 0 8px 0;
+            color: var(--ai-text-primary);
+          }
+
+          p {
+            margin: 0 0 16px 0;
+            color: var(--ai-text-secondary);
+          }
+
+          .supported-formats {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+          }
+        }
+      }
+
+      .image-display {
+        position: relative;
+        min-height: 400px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--ai-bg-tertiary);
+        border-radius: 12px;
+        overflow: hidden;
+
+        img {
+          max-width: 100%;
+          max-height: 500px;
+          object-fit: contain;
+        }
+
+        .image-actions {
+          position: absolute;
+          bottom: 16px;
+          left: 50%;
+          transform: translateX(-50%);
+          display: flex;
+          gap: 12px;
+        }
+      }
+    }
+
+    .url-input {
+      margin-top: 16px;
+    }
+  }
+
+  .results-card {
+    height: 100%;
+    min-height: 600px;
+
+    .empty-results {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 400px;
+      color: var(--ai-text-muted);
+
+      .el-icon {
+        margin-bottom: 16px;
+      }
+    }
+
+    .recognition-results {
+      .primary-result {
+        background: rgba(99, 102, 241, 0.1);
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 24px;
+
+        .result-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 12px;
+
+          h4 {
+            margin: 0;
+            color: var(--ai-text-primary);
+          }
+
+          .confidence-badge {
+            background: var(--ai-primary);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-weight: 600;
+          }
+        }
+
+        .result-description {
+          margin: 12px 0 0 0;
+          color: var(--ai-text-secondary);
+          line-height: 1.6;
+        }
+      }
+
+      .alternative-results {
+        margin-bottom: 24px;
+
+        h4 {
+          margin: 0 0 12px 0;
+          color: var(--ai-text-primary);
+        }
+
+        .alternatives-list {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+
+          .alternative-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+
+            .alt-label {
+              flex: 1;
+              color: var(--ai-text-secondary);
+            }
+
+            .el-progress {
+              flex: 2;
+            }
+          }
+        }
+      }
+
+      .image-attributes {
+        h4 {
+          margin: 0 0 12px 0;
+          color: var(--ai-text-primary);
+        }
+
+        .attributes-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 12px;
+
+          .attribute-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px;
+            background: var(--ai-card-bg);
+            border-radius: 8px;
+
+            .el-icon {
+              color: var(--ai-primary);
+            }
+
+            .attr-name {
+              color: var(--ai-text-muted);
+              font-size: 14px;
+            }
+
+            .attr-value {
+              margin-left: auto;
+              color: var(--ai-text-primary);
+              font-weight: 500;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  .history-card {
+    margin-top: 24px;
+
+    .history-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      max-height: 300px;
+      overflow-y: auto;
+
+      .history-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 8px;
+        background: var(--ai-card-bg);
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+
+        &:hover {
+          background: var(--ai-card-bg-hover);
+        }
+
+        img {
+          width: 48px;
+          height: 48px;
+          border-radius: 4px;
+          object-fit: cover;
+        }
+
+        .history-info {
+          flex: 1;
+
+          .history-label {
+            display: block;
+            color: var(--ai-text-primary);
+            font-weight: 500;
+          }
+
+          .history-time {
+            font-size: 12px;
+            color: var(--ai-text-muted);
+          }
+        }
+      }
+    }
+  }
+}
+
+.advanced-features {
+  max-width: 1200px;
+  margin: 0 auto;
+
+  .batch-upload {
+    text-align: center;
+
+    :deep(.el-upload-dragger) {
+      background: var(--ai-bg-tertiary);
+      border-color: var(--ai-border);
+
+      &:hover {
+        border-color: var(--ai-primary);
+      }
+    }
+
+    .el-button {
+      margin-top: 16px;
+    }
+  }
+
+  .similar-search,
+  .api-integration {
+    text-align: center;
+    padding: 32px;
+
+    p {
+      margin: 0 0 16px 0;
+      color: var(--ai-text-secondary);
+    }
+  }
+}
+
+// 深色主题下的标签页
+:deep(.el-tabs) {
+  --el-tabs-header-height: 48px;
+
+  .el-tabs__nav-wrap {
+    &::after {
+      background-color: var(--ai-border);
+    }
+  }
+
+  .el-tabs__item {
+    color: var(--ai-text-secondary);
+
+    &:hover {
+      color: var(--ai-text-primary);
+    }
+
+    &.is-active {
+      color: var(--ai-primary);
+    }
+  }
+
+  .el-tabs__active-bar {
+    background-color: var(--ai-primary);
+  }
+}
+</style>

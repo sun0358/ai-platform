@@ -1,0 +1,257 @@
+// frontend/src/styles/forms.scss
+
+// 表单容器
+.form-container {
+  max-width: 600px;
+  margin: 0 auto;
+
+  &--wide {
+    max-width: 900px;
+  }
+
+  &--narrow {
+    max-width: 400px;
+  }
+}
+
+// 表单组
+.form-group {
+  margin-bottom: 24px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+
+  .form-label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--ai-text-primary);
+
+    &.required::after {
+      content: ' *';
+      color: var(--ai-error);
+    }
+  }
+
+  .form-help {
+    margin-top: 8px;
+    font-size: 13px;
+    color: var(--ai-text-muted);
+  }
+
+  .form-error {
+    margin-top: 8px;
+    font-size: 13px;
+    color: var(--ai-error);
+  }
+}
+
+// 表单行
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+// Element Plus 表单样式覆盖
+.ai-form {
+  :deep(.el-form-item) {
+    margin-bottom: 24px;
+
+    .el-form-item__label {
+      color: var(--ai-text-primary);
+      font-weight: 500;
+    }
+
+    .el-form-item__error {
+      color: var(--ai-error);
+      margin-top: 4px;
+    }
+  }
+
+  // 输入框样式
+  :deep(.el-input) {
+    .el-input__wrapper {
+      background: var(--ai-bg-tertiary);
+      border-color: var(--ai-border);
+      box-shadow: none;
+
+      &:hover {
+        border-color: var(--ai-primary);
+      }
+
+      &.is-focus {
+        border-color: var(--ai-primary);
+        box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+      }
+    }
+
+    .el-input__inner {
+      color: var(--ai-text-primary);
+
+      &::placeholder {
+        color: var(--ai-text-muted);
+      }
+    }
+
+    &.is-disabled {
+      .el-input__wrapper {
+        background: var(--ai-bg-secondary);
+        cursor: not-allowed;
+      }
+    }
+  }
+
+  // 文本域样式
+  :deep(.el-textarea) {
+    .el-textarea__inner {
+      background: var(--ai-bg-tertiary);
+      border-color: var(--ai-border);
+      color: var(--ai-text-primary);
+
+      &::placeholder {
+        color: var(--ai-text-muted);
+      }
+
+      &:hover {
+        border-color: var(--ai-primary);
+      }
+
+      &:focus {
+        border-color: var(--ai-primary);
+        box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+      }
+    }
+  }
+
+  // 选择器样式
+  :deep(.el-select) {
+    width: 100%;
+
+    .el-input__wrapper {
+      background: var(--ai-bg-tertiary);
+      border-color: var(--ai-border);
+    }
+  }
+
+  // 开关样式
+  :deep(.el-switch) {
+    &.is-checked {
+      .el-switch__core {
+        background-color: var(--ai-primary);
+        border-color: var(--ai-primary);
+      }
+    }
+  }
+
+  // 复选框样式
+  :deep(.el-checkbox) {
+    .el-checkbox__label {
+      color: var(--ai-text-secondary);
+    }
+
+    &.is-checked {
+      .el-checkbox__inner {
+        background-color: var(--ai-primary);
+        border-color: var(--ai-primary);
+      }
+    }
+  }
+
+  // 单选框样式
+  :deep(.el-radio) {
+    .el-radio__label {
+      color: var(--ai-text-secondary);
+    }
+
+    &.is-checked {
+      .el-radio__inner {
+        background-color: var(--ai-primary);
+        border-color: var(--ai-primary);
+      }
+    }
+  }
+}
+
+// 表单操作区
+.form-actions {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 32px;
+  padding-top: 32px;
+  border-top: 1px solid var(--ai-border);
+
+  &--right {
+    justify-content: flex-end;
+  }
+
+  &--space-between {
+    justify-content: space-between;
+  }
+
+  .el-button {
+    min-width: 120px;
+  }
+}
+
+// 内联表单
+.inline-form {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+
+  .form-group {
+    margin-bottom: 0;
+    flex: 1;
+  }
+
+  .el-button {
+    flex-shrink: 0;
+  }
+}
+
+// 表单提示
+.form-tips {
+  padding: 16px;
+  background: rgba(99, 102, 241, 0.1);
+  border-radius: 8px;
+  margin-bottom: 24px;
+
+  h4 {
+    margin: 0 0 8px 0;
+    color: var(--ai-primary);
+    font-size: 16px;
+  }
+
+  p {
+    margin: 0;
+    color: var(--ai-text-secondary);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+}
+
+// 验证状态
+.form-field {
+  &--error {
+    .el-input__wrapper {
+      border-color: var(--ai-error) !important;
+    }
+  }
+
+  &--success {
+    .el-input__wrapper {
+      border-color: var(--ai-success) !important;
+    }
+  }
+
+  &--warning {
+    .el-input__wrapper {
+      border-color: var(--ai-warning) !important;
+    }
+  }
+}

@@ -1,0 +1,94 @@
+// frontend/src/styles/index.scss
+
+// 使用新的@use语法替代@import
+@use './variables' as vars;
+@use './mixins' as mixins;
+
+// 全局重置样式
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  height: 100%;
+  box-sizing: border-box;
+}
+
+body {
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB',
+  'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  color: vars.$text-color;
+  background-color: vars.$bg-color;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#app {
+  height: 100%;
+}
+
+// 滚动条样式
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #ddd;
+  border-radius: 4px;
+
+  &:hover {
+    background: #ccc;
+  }
+}
+
+// 通用样式类
+.page-container {
+  padding: 20px;
+  background-color: #fff;
+  border-radius: 4px;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+// 过渡动画
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+// 响应式断点
+@include mixins.respond-to('mobile') {
+  .hide-mobile {
+    display: none !important;
+  }
+}
+
+@include mixins.respond-to('tablet') {
+  .hide-tablet {
+    display: none !important;
+  }
+}
+
+@include mixins.respond-to('desktop') {
+  .hide-desktop {
+    display: none !important;
+  }
+}

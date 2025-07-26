@@ -12,27 +12,67 @@
   }
 }
 
-// 文本截断
+// 公共mixins
+@mixin glass-card {
+  background: var(--ai-glass-bg);
+  border: 1px solid var(--ai-glass-border);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  box-shadow: var(--ai-glass-shadow);
+}
+
+@mixin fade-slide {
+  opacity: 0;
+  transform: translateY(20px);
+  animation: fadeSlideIn 0.6s ease-out forwards;
+}
+
 @mixin text-ellipsis {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-// 多行文本截断
-@mixin text-ellipsis-multi($lines: 2) {
+@mixin text-ellipsis-multiline($lines: 2) {
   display: -webkit-box;
   -webkit-line-clamp: $lines;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 
-// 居中布局
-@mixin flex-center {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+@mixin ai-button {
+  background: linear-gradient(135deg, var(--ai-primary), var(--ai-primary-light));
+  border: none;
+  border-radius: 12px;
+  color: white;
+  padding: 12px 24px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  cursor: pointer;
+
+  &:hover {
+    background: linear-gradient(135deg, var(--ai-primary-light), var(--ai-primary));
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(99, 102, 241, 0.3);
+  }
+}
+
+@mixin ai-card {
+  @include glass-card;
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+@mixin upload-area {
+  border: 2px dashed var(--ai-border);
+  border-radius: 12px;
+  background: var(--ai-glass-bg);
+  transition: all 0.3s ease;
+
+  &:hover {
+    border-color: var(--ai-primary);
+    background: rgba(99, 102, 241, 0.05);
+  }
 }
 
 // 响应式媒体查询

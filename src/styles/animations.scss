@@ -1,7 +1,9 @@
 // frontend/src/styles/animations.scss
 
-// 淡入淡出
-@keyframes fade-in {
+// 公共动画效果
+
+// 淡入淡出动画
+@keyframes fadeIn {
   from {
     opacity: 0;
   }
@@ -10,7 +12,7 @@
   }
 }
 
-@keyframes fade-out {
+@keyframes fadeOut {
   from {
     opacity: 1;
   }
@@ -20,6 +22,28 @@
 }
 
 // 滑入动画
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @keyframes slide-in-up {
   from {
     opacity: 0;
@@ -64,6 +88,25 @@
   }
 }
 
+// 弹性动画
+@keyframes bounceIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  70% {
+    transform: scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 // 缩放动画
 @keyframes scale-in {
   from {
@@ -87,57 +130,26 @@
   }
 }
 
-// 旋转动画
-@keyframes rotate {
-  from {
-    transform: rotate(0deg);
+// 呼吸动画
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.7);
   }
-  to {
-    transform: rotate(360deg);
+  70% {
+    box-shadow: 0 0 0 10px rgba(99, 102, 241, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0);
   }
 }
 
+// 加载动画
 @keyframes spin {
   0% {
     transform: rotate(0deg);
   }
   100% {
     transform: rotate(360deg);
-  }
-}
-
-// 脉冲动画
-@keyframes pulse {
-  0% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.8;
-    transform: scale(1.05);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-@keyframes pulse-glow {
-  0%, 100% {
-    box-shadow: 0 0 20px rgba(99, 102, 241, 0.5);
-  }
-  50% {
-    box-shadow: 0 0 40px rgba(99, 102, 241, 0.8);
-  }
-}
-
-// 闪烁动画
-@keyframes blink {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
   }
 }
 
@@ -179,7 +191,7 @@
   }
 }
 
-// 动画类
+// Vue过渡动画类
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.3s ease;
@@ -240,7 +252,7 @@
 
 // 常用动画效果类
 .animate-fade-in {
-  animation: fade-in 0.6s ease-out;
+  animation: fadeIn 0.6s ease-out;
 }
 
 .animate-slide-up {
@@ -257,4 +269,25 @@
 
 .animate-pulse {
   animation: pulse 2s ease-in-out infinite;
+}
+
+// 公共动画类
+.fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.fade-out {
+  animation: fadeOut 0.3s ease-in-out;
+}
+
+.slide-down {
+  animation: slideDown 0.4s ease-out;
+}
+
+.bounce-in {
+  animation: bounceIn 0.6s ease-out;
+}
+
+.fade-slide {
+  animation: fadeSlideIn 0.6s ease-out;
 }

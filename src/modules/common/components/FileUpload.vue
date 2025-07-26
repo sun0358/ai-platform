@@ -1,274 +1,324 @@
 <template>
-  <div class="file-upload-component">
-    <div
-        class="upload-area"
-        :class="{ 'has-file': hasFile, 'is-dragging': isDragging }"
-        @click="!hasFile && selectFile()"
-        @dragover.prevent="handleDragOver"
-        @dragleave.prevent="handleDragLeave"
-        @drop.prevent="handleDrop"
+  <div class="file-upload-container">
+    <el-upload
+      v-model:file-list="fileList"
+      class="upload-demo"
+      drag
+      :accept="accept"
+      :multiple="false"
+      :auto-upload="false"
+      :on-change="handleChange"
+      :on-remove="handleRemove"
+      :before-upload="beforeUpload"
+      :limit="1"
     >
-      <!-- 上传占位符 -->
-      <div v-if="!hasFile" class="upload-placeholder">
-        <el-icon :size="iconSize"><component :is="uploadIcon || 'UploadFilled'" /></el-icon>
-        <h4>{{ title || '拖拽文件到此处' }}</h4>
-        <p>{{ description || '或点击选择文件' }}</p>
-        <div v-if="showFormats && acceptFormats.length > 0" class="file-formats">
-          <el-tag v-for="format in acceptFormats" :key="format" size="small">
-            {{ format }}
-          </el-tag>
+      <div class="upload-content">
+        <el-icon class="upload-icon" :size="iconSize || 60">
+          <component :is="fileIcon || 'UploadFilled'" />
+        </el-icon>
+        <div class="upload-text">
+          <h3 v-if="title">{{ title }}</h3>
+          <p v-if="description">{{ description }}</p>
         </div>
       </div>
+    </el-upload>
 
-      <!-- 文件信息 -->
-      <div v-else class="file-info">
-        <div class="file-icon">
-          <el-icon :size="48"><component :is="fileIcon || 'Document'" /></el-icon>
-        </div>
+    <!-- 文件预览区域 -->
+    <div v-if="uploadedFile" class="file-preview fade-slide">
+      <div class="file-info">
+        <el-icon class="file-icon"><component :is="getFileIcon(uploadedFile.name)" /></el-icon>
         <div class="file-details">
-          <h4>{{ fileName }}</h4>
-          <div class="file-meta">
-            <span>{{ formatFileSize(fileSize) }}</span>
-            <span v-if="$slots.meta"><slot name="meta"></slot></span>
-          </div>
+          <h4>{{ uploadedFile.name }}</h4>
+          <p>{{ formatFileSize(uploadedFile.size) }}</p>
         </div>
-        <el-button type="danger" circle @click.stop="removeFile">
+        <el-button @click="removeFile" type="danger" text class="remove-btn">
           <el-icon><Delete /></el-icon>
         </el-button>
       </div>
+
+      <!-- 图片预览 -->
+      <div v-if="isImage(uploadedFile.name)" class="image-preview">
+        <img :src="previewUrl" :alt="uploadedFile.name" />
+      </div>
     </div>
 
-    <input
-        ref="fileInput"
-        type="file"
-        :accept="accept"
-        :multiple="multiple"
-        style="display: none"
-        @change="handleFileSelect"
-    />
-
     <!-- 额外内容插槽 -->
-    <div v-if="$slots.extra" class="upload-extra">
+    <div v-if="uploadedFile && $slots.extra" class="extra-content fade-slide">
       <slot name="extra"></slot>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
+import type { UploadFile, UploadFiles } from 'element-plus'
 import { ElMessage } from 'element-plus'
-import { UploadFilled, Document, Delete } from '@element-plus/icons-vue'
+import { UploadFilled, DocumentCopy, Picture, Delete } from '@element-plus/icons-vue'
 
 interface Props {
+  modelValue?: File | null
   accept?: string
-  multiple?: boolean
   maxSize?: number // MB
   title?: string
   description?: string
-  uploadIcon?: string
   fileIcon?: string
   iconSize?: number
-  showFormats?: boolean
-  formats?: string[]
 }
 
 const props = withDefaults(defineProps<Props>(), {
   accept: '*',
-  multiple: false,
   maxSize: 10,
-  iconSize: 60,
-  showFormats: true,
-  formats: () => []
+  fileIcon: 'UploadFilled',
+  iconSize: 60
 })
 
 const emit = defineEmits<{
-  change: [files: File | File[] | null]
-  remove: []
+  'update:modelValue': [file: File | null]
+  'change': [file: File | null]
 }>()
 
-// 响应式数据
-const fileInput = ref<HTMLInputElement>()
-const isDragging = ref(false)
+const fileList = ref<UploadFiles>([])
 const uploadedFile = ref<File | null>(null)
-const uploadedFiles = ref<File[]>([])
+const previewUrl = ref<string>('')
 
-// 计算属性
-const hasFile = computed(() => props.multiple ? uploadedFiles.value.length > 0 : !!uploadedFile.value)
-const fileName = computed(() => uploadedFile.value?.name || '多个文件')
-const fileSize = computed(() => uploadedFile.value?.size || 0)
-const acceptFormats = computed(() => {
-  if (props.formats.length > 0) return props.formats
-  if (!props.accept || props.accept === '*') return []
-  return props.accept.split(',').map(ext => ext.trim().replace('.', '').toUpperCase())
-})
-
-// 方法
-const selectFile = () => {
-  fileInput.value?.click()
-}
-
-const handleFileSelect = (e: Event) => {
-  const target = e.target as HTMLInputElement
-  const files = target.files
-  if (files) {
-    processFiles(files)
-  }
-}
-
-const handleDragOver = () => {
-  isDragging.value = true
-}
-
-const handleDragLeave = () => {
-  isDragging.value = false
-}
-
-const handleDrop = (e: DragEvent) => {
-  isDragging.value = false
-  const files = e.dataTransfer?.files
-  if (files) {
-    processFiles(files)
-  }
-}
-
-const processFiles = (files: FileList) => {
-  // 验证文件
-  for (const file of Array.from(files)) {
-    if (props.maxSize && file.size > props.maxSize * 1024 * 1024) {
-      ElMessage.error(`文件 ${file.name} 大小超过 ${props.maxSize}MB`)
-      return
+// 监听 modelValue 变化
+watch(() => props.modelValue, (newValue) => {
+  if (newValue !== uploadedFile.value) {
+    uploadedFile.value = newValue
+    if (newValue && isImage(newValue.name)) {
+      previewUrl.value = URL.createObjectURL(newValue)
     }
   }
+}, { immediate: true })
 
-  if (props.multiple) {
-    uploadedFiles.value = Array.from(files)
-    emit('change', uploadedFiles.value)
-  } else {
-    uploadedFile.value = files[0]
-    emit('change', uploadedFile.value)
+const handleChange = (file: UploadFile, files: UploadFiles) => {
+  const rawFile = file.raw
+  if (rawFile) {
+    uploadedFile.value = rawFile
+
+    // 如果是图片，创建预览URL
+    if (isImage(rawFile.name)) {
+      previewUrl.value = URL.createObjectURL(rawFile)
+    }
+
+    emit('update:modelValue', rawFile)
+    emit('change', rawFile)
   }
+}
+
+const handleRemove = () => {
+  removeFile()
 }
 
 const removeFile = () => {
   uploadedFile.value = null
-  uploadedFiles.value = []
-  emit('remove')
-  emit('change', null)
-
-  // 重置input
-  if (fileInput.value) {
-    fileInput.value.value = ''
+  fileList.value = []
+  if (previewUrl.value) {
+    URL.revokeObjectURL(previewUrl.value)
+    previewUrl.value = ''
   }
+  emit('update:modelValue', null)
+  emit('change', null)
+}
+
+const beforeUpload = (file: File) => {
+  // 检查文件大小
+  if (file.size / 1024 / 1024 > props.maxSize) {
+    ElMessage.error(`文件大小不能超过 ${props.maxSize}MB`)
+    return false
+  }
+
+  // 检查文件类型
+  if (props.accept !== '*') {
+    const acceptTypes = props.accept.split(',').map(type => type.trim())
+    const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase()
+    const isAccepted = acceptTypes.some(type =>
+      type === fileExtension ||
+      type === file.type ||
+      (type.includes('*') && file.type.startsWith(type.replace('*', '')))
+    )
+
+    if (!isAccepted) {
+      ElMessage.error(`不支持的文件格式，请上传 ${props.accept} 格式的文件`)
+      return false
+    }
+  }
+
+  return true
+}
+
+const isImage = (filename: string) => {
+  const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp']
+  const extension = '.' + filename.split('.').pop()?.toLowerCase()
+  return imageExtensions.includes(extension)
+}
+
+const getFileIcon = (filename: string) => {
+  if (isImage(filename)) {
+    return 'Picture'
+  }
+  const extension = filename.split('.').pop()?.toLowerCase()
+  if (['xlsx', 'xls'].includes(extension || '')) {
+    return 'DocumentCopy'
+  }
+  return 'Document'
 }
 
 const formatFileSize = (bytes: number) => {
-  if (bytes < 1024) return bytes + ' B'
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+  if (bytes === 0) return '0 Bytes'
+  const k = 1024
+  const sizes = ['Bytes', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
 }
-
-// 暴露方法
-defineExpose({
-  selectFile,
-  removeFile
-})
 </script>
 
-<style lang="scss" scoped>
-.file-upload-component {
+<style scoped lang="scss">
+@import '@/styles/mixins.scss';
+@import '@/styles/animations.scss';
+
+.file-upload-container {
   width: 100%;
 
-  .upload-area {
-    position: relative;
-    min-height: 200px;
-    background: var(--ai-bg-tertiary);
-    border: 2px dashed var(--ai-border);
-    border-radius: 12px;
-    transition: all 0.3s ease;
-    cursor: pointer;
+  .upload-demo {
+    width: 100%;
 
-    &:hover:not(.has-file) {
-      border-color: var(--ai-primary);
-      background: var(--ai-card-bg-hover);
-    }
-
-    &.is-dragging {
-      border-color: var(--ai-primary);
-      background: rgba(99, 102, 241, 0.1);
-    }
-
-    &.has-file {
-      border-style: solid;
-      cursor: default;
-    }
-
-    .upload-placeholder {
+    :deep(.el-upload-dragger) {
+      @include upload-area;
+      width: 100%;
       height: 200px;
       display: flex;
-      flex-direction: column;
       align-items: center;
       justify-content: center;
+    }
+  }
+
+  .upload-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+
+    .upload-icon {
+      color: var(--ai-primary);
+      margin-bottom: 16px;
+      transition: all 0.3s ease;
+    }
+
+    .upload-text {
       text-align: center;
 
-      .el-icon {
-        color: var(--ai-primary);
-        margin-bottom: 16px;
-      }
-
-      h4 {
+      h3 {
         margin: 0 0 8px 0;
+        font-size: 18px;
+        font-weight: 500;
         color: var(--ai-text-primary);
       }
 
       p {
-        margin: 0 0 16px 0;
+        margin: 0;
+        font-size: 14px;
         color: var(--ai-text-secondary);
       }
-
-      .file-formats {
-        display: flex;
-        gap: 8px;
-        justify-content: center;
-      }
     }
+  }
+
+  .file-preview {
+    @include ai-card;
+    margin-top: 16px;
 
     .file-info {
-      padding: 24px;
       display: flex;
       align-items: center;
-      gap: 16px;
+      gap: 12px;
+      margin-bottom: 12px;
 
       .file-icon {
-        width: 64px;
-        height: 64px;
-        background: rgba(99, 102, 241, 0.1);
-        border-radius: 12px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
         color: var(--ai-primary);
+        font-size: 24px;
       }
 
       .file-details {
         flex: 1;
 
         h4 {
-          margin: 0 0 8px 0;
+          margin: 0;
+          font-size: 16px;
+          font-weight: 500;
           color: var(--ai-text-primary);
+          @include text-ellipsis;
         }
 
-        .file-meta {
-          display: flex;
-          gap: 16px;
-          color: var(--ai-text-muted);
-          font-size: 14px;
+        p {
+          margin: 4px 0 0 0;
+          font-size: 12px;
+          color: var(--ai-text-secondary);
+        }
+      }
+
+      .remove-btn {
+        color: var(--ai-error);
+        transition: all 0.3s ease;
+
+        &:hover {
+          background: rgba(239, 68, 68, 0.1);
+          transform: scale(1.1);
+        }
+      }
+    }
+
+    .image-preview {
+      text-align: center;
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--ai-bg-tertiary);
+
+      img {
+        max-width: 100%;
+        max-height: 200px;
+        border-radius: 8px;
+        object-fit: contain;
+        transition: transform 0.3s ease;
+
+        &:hover {
+          transform: scale(1.02);
         }
       }
     }
   }
 
-  .upload-extra {
+  .extra-content {
     margin-top: 16px;
+  }
+
+  // 上传区域悬停效果增强
+  .upload-demo:hover {
+    .upload-icon {
+      color: var(--ai-primary-light);
+      transform: scale(1.1);
+    }
+  }
+}
+
+// 深色主题特定样式
+html.dark .file-upload-container {
+  .upload-content .upload-text {
+    h3, p {
+      color: var(--ai-text-primary);
+    }
+  }
+}
+
+// 浅色主题特定样式
+html.light .file-upload-container {
+  .upload-content .upload-text {
+    h3 {
+      color: var(--ai-text-primary);
+    }
+    p {
+      color: var(--ai-text-secondary);
+    }
   }
 }
 </style>

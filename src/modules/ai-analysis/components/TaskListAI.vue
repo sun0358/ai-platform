@@ -268,7 +268,8 @@ defineExpose({ refresh, addTask })
 <style lang="scss" scoped>
 .task-list-ai {
   .refresh-btn {
-    background: rgba(99, 102, 241, 0.1);
+    //background: rgba(99, 102, 241, 0.1);
+    background: transparent;
     border-color: var(--ai-primary);
     color: var(--ai-primary);
 

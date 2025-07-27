@@ -19,7 +19,7 @@
       </div>
     </div>
 
-    <div v-show="viewMode === 'create'">
+    <div v-show="viewMode === 'create' && !hideUploadArea">
       <div class="create-view">
         <AICard variant="glass" class="upload-card">
           <template #header>
@@ -197,14 +197,26 @@
       </div>
     </transition>
 
+    <!-- 详细分析结果 -->
     <transition name="fade-slide">
-      <ComparisonResult
-          v-if="detailedResult"
-          :result="detailedResult.result"
-          :task-info="detailedResult.taskInfo"
-          :details="detailedResult.details"
-          class="comparison"
-      />
+      <div v-if="detailedResult" class="comparison-result-section">
+        <!-- 返回按钮 -->
+        <div class="result-header" v-if="resultViewSource === 'list'">
+          <el-button
+              @click="backToList"
+              :icon="ArrowLeft"
+          >
+            返回任务列表
+          </el-button>
+        </div>
+
+        <ComparisonResult
+            :result="detailedResult.result"
+            :task-info="detailedResult.taskInfo"
+            :details="detailedResult.details"
+            class="comparison"
+        />
+      </div>
     </transition>
   </div>
 </template>
@@ -214,7 +226,8 @@ import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { ElMessage, ElLoading } from 'element-plus'
 import {
   Camera, List, Plus, Cpu, Edit, Picture,
-  Grid, MagicStick, RefreshRight, View, Loading
+  Grid, MagicStick, RefreshRight, View, Loading,
+  ArrowLeft
 } from '@element-plus/icons-vue'
 import AICard from '@/modules/common/components/AICard.vue'
 import ImageUploadAI from '../components/ImageUploadAI.vue'
@@ -230,6 +243,8 @@ const images = ref<Record<string, string>>({})
 const taskListRef = ref()
 const currentTask = ref<any>(null)
 const detailedResult = ref<any>(null) // 用于存储详细分析结果
+const hideUploadArea = ref(false) // 控制上传区域的显示
+const resultViewSource = ref<'current' | 'list'>('current') // 记录结果视图的来源
 
 const formData = ref({
   task_name: '',
@@ -253,6 +268,7 @@ const canSubmit = computed(() => {
 const toggleViewMode = () => {
   viewMode.value = viewMode.value === 'create' ? 'tasks' : 'create'
   detailedResult.value = null // 切换视图时清空详细结果
+  hideUploadArea.value = false // 添加这一行
 }
 
 const loadModels = async () => {
@@ -357,7 +373,7 @@ const startTaskMonitoring = (taskId: string) => {
 }
 
 // --- 核心改动：新的函数，用于获取并显示详细结果 ---
-const showDetailedResult = async (taskId: string, baseTaskInfo: any) => {
+const showDetailedResult = async (taskId: string, baseTaskInfo: any, source: 'current' | 'list' = 'current') => {
   const loadingInstance = ElLoading.service({
     lock: true,
     text: '正在加载详细分析报告...',
@@ -366,15 +382,31 @@ const showDetailedResult = async (taskId: string, baseTaskInfo: any) => {
 
   try {
     const details = await imageComparisonApi.getAnalysisDetails(taskId);
-    // 组合成最终传递给 ComparisonResult 的对象
     detailedResult.value = {
-      result: baseTaskInfo.result, // 基础结果，如 best_match 和 scores
-      taskInfo: baseTaskInfo,       // 基础任务信息，如任务名
-      details: details              // 后端生成的详细分析报告
+      result: baseTaskInfo.result,
+      taskInfo: baseTaskInfo,
+      details: details
     };
 
+    // 添加这两行
+    resultViewSource.value = source;
+    if (source === 'list') {
+      hideUploadArea.value = true;
+    }
+
     await nextTick();
-    document.querySelector('.comparison')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    // 修改滚动目标
+    setTimeout(() => {
+      const resultSection = document.querySelector('.comparison-result-section');
+      if (resultSection) {
+        resultSection.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+          inline: 'nearest'
+        });
+      }
+    }, 400); // 400ms 对应 CSS 中的过渡时间
   } catch (error) {
     ElMessage.error('加载详细报告失败');
     detailedResult.value = null;
@@ -383,31 +415,38 @@ const showDetailedResult = async (taskId: string, baseTaskInfo: any) => {
   }
 }
 
-const viewDetailedResult = (taskId: string) => {
-  if (currentTask.value && currentTask.value.result) {
-    showDetailedResult(taskId, currentTask.value);
-  } else {
-    ElMessage.info('结果数据尚未就绪。');
+  const viewDetailedResult = (taskId: string) => {
+    if (currentTask.value && currentTask.value.result) {
+      showDetailedResult(taskId, currentTask.value, 'current'); // 添加 'current' 参数
+    } else {
+      ElMessage.info('结果数据尚未就绪。');
+    }
   }
-}
 
-const handleViewResult = (task: any) => {
-  if (task.result) {
-    viewMode.value = 'create'; // 切换回创建视图以显示结果
-    showDetailedResult(task.task_id, task);
-  } else {
-    ElMessage.warning('该任务没有可供查看的详细结果。');
+  const handleViewResult = (task: any) => {
+    if (task.result) {
+      viewMode.value = 'create';
+      showDetailedResult(task.task_id, task, 'list'); // 添加 'list' 参数
+    } else {
+      ElMessage.warning('该任务没有可供查看的详细结果。');
+    }
   }
-}
+
+  // 添加这个新函数
+  const backToList = () => {
+    detailedResult.value = null;
+    hideUploadArea.value = false;
+    viewMode.value = 'tasks';
+  }
 
 
-const createNewTask = () => {
-  currentTask.value = null
-  detailedResult.value = null
-  clearAll()
-  viewMode.value = 'create'
-}
-
+  const createNewTask = () => {
+    currentTask.value = null
+    detailedResult.value = null
+    hideUploadArea.value = false // 添加这一行
+    clearAll()
+    viewMode.value = 'create'
+  }
 const retryTask = async () => {
   if (currentTask.value) await handleSubmit()
 }
@@ -793,17 +832,17 @@ onUnmounted(() => { if (taskMonitoringTimer) clearInterval(taskMonitoringTimer) 
     margin: 32px auto;
   }
 
-  .comparison{
-    max-width: 1400px;
-    margin: 32px auto;
-    padding: 20px;
-    background: rgba(255, 255, 255, 0.08);
-    backdrop-filter: blur(10px);
-    border-radius: 16px;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-    animation: slideInUp 0.6s ease-out;
-  }
+  //.comparison{
+  //  max-width: 1400px;
+  //  margin: 32px auto;
+  //  padding: 20px;
+  //  background: rgba(255, 255, 255, 0.08);
+  //  backdrop-filter: blur(10px);
+  //  border-radius: 16px;
+  //  border: 1px solid rgba(255, 255, 255, 0.15);
+  //  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  //  animation: slideInUp 0.6s ease-out;
+  //}
 
   @keyframes slideInUp {
     from { opacity: 0; transform: translateY(30px); }
@@ -847,6 +886,26 @@ onUnmounted(() => { if (taskMonitoringTimer) clearInterval(taskMonitoringTimer) 
 
   &.is-focus {
     border-color: var(--ai-primary);
+  }
+  // 添加新的样式
+  .comparison-result-section {
+    max-width: 1400px;
+    margin: 32px auto;
+
+    .result-header {
+      margin-bottom: 24px;
+    }
+  }
+
+  // 修改任务列表的背景，避免白色闪烁
+  .tasks-view {
+    max-width: 1400px;
+    margin: 32px auto;
+
+    // 确保初始背景透明
+    :deep(.task-list-ai) {
+      background: transparent;
+    }
   }
 }
 </style>

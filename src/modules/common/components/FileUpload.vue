@@ -1,323 +1,187 @@
 <template>
-  <div class="file-upload-container">
-    <el-upload
-      v-model:file-list="fileList"
-      class="upload-demo"
-      drag
-      :accept="accept"
-      :multiple="false"
-      :auto-upload="false"
-      :on-change="handleChange"
-      :on-remove="handleRemove"
-      :before-upload="beforeUpload"
-      :limit="1"
+  <div class="file-upload-ai-style">
+    <BaseUploader
+        v-if="!modelValue"
+        v-model="internalFile"
+        :accept="accept"
+        :max-size="maxSize"
+        @change="handleFileChange"
     >
-      <div class="upload-content">
-        <el-icon class="upload-icon" :size="iconSize || 60">
-          <component :is="fileIcon || 'UploadFilled'" />
-        </el-icon>
+      <div class="upload-area">
+        <el-icon class="upload-icon" :size="iconSize"><component :is="fileIcon" /></el-icon>
         <div class="upload-text">
           <h3 v-if="title">{{ title }}</h3>
           <p v-if="description">{{ description }}</p>
         </div>
       </div>
-    </el-upload>
+    </BaseUploader>
 
-    <!-- 文件预览区域 -->
-    <div v-if="uploadedFile" class="file-preview fade-slide">
-      <div class="file-info">
-        <el-icon class="file-icon"><component :is="getFileIcon(uploadedFile.name)" /></el-icon>
+    <div v-else class="preview-card animate-fade-in">
+      <div class="file-info-bar">
         <div class="file-details">
-          <h4>{{ uploadedFile.name }}</h4>
-          <p>{{ formatFileSize(uploadedFile.size) }}</p>
+          <el-icon class="file-icon" :size="32"><component :is="getIconByFileName(modelValue.name)" /></el-icon>
+          <div class="file-meta">
+            <h4 class="file-name">{{ modelValue.name }}</h4>
+            <p class="file-size">{{ formatFileSize(modelValue.size) }}</p>
+          </div>
         </div>
-        <el-button @click="removeFile" type="danger" text class="remove-btn">
+        <el-button @click="handleRemove" type="danger" text>
           <el-icon><Delete /></el-icon>
+          <span>移除</span>
         </el-button>
       </div>
-
-      <!-- 图片预览 -->
-      <div v-if="isImage(uploadedFile.name)" class="image-preview">
-        <img :src="previewUrl" :alt="uploadedFile.name" />
+      <div v-if="$slots.extra" class="extra-content">
+        <slot name="extra"></slot>
       </div>
-    </div>
-
-    <!-- 额外内容插槽 -->
-    <div v-if="uploadedFile && $slots.extra" class="extra-content fade-slide">
-      <slot name="extra"></slot>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
-import type { UploadFile, UploadFiles } from 'element-plus'
-import { ElMessage } from 'element-plus'
-import { UploadFilled, DocumentCopy, Picture, Delete } from '@element-plus/icons-vue'
+import { ref } from 'vue';
+import { Delete, Document, UploadFilled, Tickets, Service } from '@element-plus/icons-vue';
+import BaseUploader from './BaseUploader.vue'; // 引入底层发动机
 
 interface Props {
-  modelValue?: File | null
-  accept?: string
-  maxSize?: number // MB
-  title?: string
-  description?: string
-  fileIcon?: string
-  iconSize?: number
+  modelValue: File | null;
+  accept?: string;
+  maxSize?: number;
+  title?: string;
+  description?: string;
+  fileIcon?: string;
+  iconSize?: number;
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  modelValue: null,
   accept: '*',
   maxSize: 10,
   fileIcon: 'UploadFilled',
-  iconSize: 60
-})
+  iconSize: 60,
+});
 
 const emit = defineEmits<{
-  'update:modelValue': [file: File | null]
-  'change': [file: File | null]
-}>()
+  'update:modelValue': [file: File | null];
+  'change': [file: File | null];
+}>();
 
-const fileList = ref<UploadFiles>([])
-const uploadedFile = ref<File | null>(null)
-const previewUrl = ref<string>('')
+// internalFile 仅用于与BaseUploader交互，实际状态由props.modelValue驱动
+const internalFile = ref<File | null>(null);
 
-// 监听 modelValue 变化
-watch(() => props.modelValue, (newValue) => {
-  if (newValue !== uploadedFile.value) {
-    uploadedFile.value = newValue
-    if (newValue && isImage(newValue.name)) {
-      previewUrl.value = URL.createObjectURL(newValue)
-    }
-  }
-}, { immediate: true })
-
-const handleChange = (file: UploadFile, files: UploadFiles) => {
-  const rawFile = file.raw
-  if (rawFile) {
-    uploadedFile.value = rawFile
-
-    // 如果是图片，创建预览URL
-    if (isImage(rawFile.name)) {
-      previewUrl.value = URL.createObjectURL(rawFile)
-    }
-
-    emit('update:modelValue', rawFile)
-    emit('change', rawFile)
-  }
-}
+const handleFileChange = (file: File | null) => {
+  emit('update:modelValue', file);
+  emit('change', file);
+};
 
 const handleRemove = () => {
-  removeFile()
-}
+  handleFileChange(null);
+};
 
-const removeFile = () => {
-  uploadedFile.value = null
-  fileList.value = []
-  if (previewUrl.value) {
-    URL.revokeObjectURL(previewUrl.value)
-    previewUrl.value = ''
-  }
-  emit('update:modelValue', null)
-  emit('change', null)
-}
-
-const beforeUpload = (file: File) => {
-  // 检查文件大小
-  if (file.size / 1024 / 1024 > props.maxSize) {
-    ElMessage.error(`文件大小不能超过 ${props.maxSize}MB`)
-    return false
-  }
-
-  // 检查文件类型
-  if (props.accept !== '*') {
-    const acceptTypes = props.accept.split(',').map(type => type.trim())
-    const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase()
-    const isAccepted = acceptTypes.some(type =>
-      type === fileExtension ||
-      type === file.type ||
-      (type.includes('*') && file.type.startsWith(type.replace('*', '')))
-    )
-
-    if (!isAccepted) {
-      ElMessage.error(`不支持的文件格式，请上传 ${props.accept} 格式的文件`)
-      return false
-    }
-  }
-
-  return true
-}
-
-const isImage = (filename: string) => {
-  const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp']
-  const extension = '.' + filename.split('.').pop()?.toLowerCase()
-  return imageExtensions.includes(extension)
-}
-
-const getFileIcon = (filename: string) => {
-  if (isImage(filename)) {
-    return 'Picture'
-  }
-  const extension = filename.split('.').pop()?.toLowerCase()
-  if (['xlsx', 'xls'].includes(extension || '')) {
-    return 'DocumentCopy'
-  }
-  return 'Document'
-}
-
+// 辅助函数
 const formatFileSize = (bytes: number) => {
-  if (bytes === 0) return '0 Bytes'
-  const k = 1024
-  const sizes = ['Bytes', 'KB', 'MB', 'GB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-}
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+};
+
+const getIconByFileName = (filename: string) => {
+  const ext = filename.split('.').pop()?.toLowerCase() || '';
+  if (['xlsx', 'xls', 'csv'].includes(ext)) return Tickets;
+  if (['doc', 'docx'].includes(ext)) return Document;
+  if (['pdf'].includes(ext)) return Service;
+  return Document;
+};
 </script>
 
-<style scoped lang="scss">
-@import '@/styles/mixins.scss';
-@import '@/styles/animations.scss';
+<style lang="scss" scoped>
+@use '@/styles/mixins' as mixins;
+@use '@/styles/animations.scss';
 
-.file-upload-container {
-  width: 100%;
+.file-upload-ai-style {
+  .upload-area {
+    @include mixins.upload-area;
 
-  .upload-demo {
-    width: 100%;
+    // 确保主题颜色正确应用
+    background: var(--ai-glass-bg);
+    border-color: var(--ai-border);
+    color: var(--ai-text-primary);
 
-    :deep(.el-upload-dragger) {
-      @include upload-area;
-      width: 100%;
-      height: 200px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+    &:hover {
+      border-color: var(--ai-primary);
+      background: var(--ai-glass-bg);
+
+      .upload-icon {
+        color: var(--ai-primary);
+      }
     }
   }
 
-  .upload-content {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
+  .upload-icon {
+    color: var(--ai-primary);
+    margin-bottom: 16px;
+    transition: all 0.3s ease;
+  }
+
+  .upload-text {
+    text-align: center;
+
+    h3 {
+      font-size: 18px;
+      color: var(--ai-text-primary);
+      margin: 0 0 8px;
+    }
+
+    p {
+      font-size: 14px;
+      color: var(--ai-text-secondary);
+      margin: 0;
+    }
+  }
+
+  .preview-card {
+    @include mixins.ai-card;
     padding: 20px;
+    background: var(--ai-card-bg);
+    border: 1px solid var(--ai-border);
 
-    .upload-icon {
-      color: var(--ai-primary);
-      margin-bottom: 16px;
-      transition: all 0.3s ease;
+    .file-info-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
 
-    .upload-text {
-      text-align: center;
-
-      h3 {
-        margin: 0 0 8px 0;
-        font-size: 18px;
-        font-weight: 500;
-        color: var(--ai-text-primary);
-      }
-
-      p {
-        margin: 0;
-        font-size: 14px;
-        color: var(--ai-text-secondary);
-      }
-    }
-  }
-
-  .file-preview {
-    @include ai-card;
-    margin-top: 16px;
-
-    .file-info {
+    .file-details {
       display: flex;
       align-items: center;
-      gap: 12px;
-      margin-bottom: 12px;
+      gap: 16px;
 
       .file-icon {
         color: var(--ai-primary);
-        font-size: 24px;
       }
 
-      .file-details {
-        flex: 1;
-
-        h4 {
+      .file-meta {
+        .file-name {
+          @include mixins.text-ellipsis;
+          max-width: 400px;
           margin: 0;
           font-size: 16px;
-          font-weight: 500;
           color: var(--ai-text-primary);
-          @include text-ellipsis;
         }
 
-        p {
-          margin: 4px 0 0 0;
+        .file-size {
+          margin: 4px 0 0;
           font-size: 12px;
           color: var(--ai-text-secondary);
         }
       }
-
-      .remove-btn {
-        color: var(--ai-error);
-        transition: all 0.3s ease;
-
-        &:hover {
-          background: rgba(239, 68, 68, 0.1);
-          transform: scale(1.1);
-        }
-      }
     }
 
-    .image-preview {
-      text-align: center;
-      border-radius: 8px;
-      overflow: hidden;
-      background: var(--ai-bg-tertiary);
-
-      img {
-        max-width: 100%;
-        max-height: 200px;
-        border-radius: 8px;
-        object-fit: contain;
-        transition: transform 0.3s ease;
-
-        &:hover {
-          transform: scale(1.02);
-        }
-      }
-    }
-  }
-
-  .extra-content {
-    margin-top: 16px;
-  }
-
-  // 上传区域悬停效果增强
-  .upload-demo:hover {
-    .upload-icon {
-      color: var(--ai-primary-light);
-      transform: scale(1.1);
-    }
-  }
-}
-
-// 深色主题特定样式
-html.dark .file-upload-container {
-  .upload-content .upload-text {
-    h3, p {
-      color: var(--ai-text-primary);
-    }
-  }
-}
-
-// 浅色主题特定样式
-html.light .file-upload-container {
-  .upload-content .upload-text {
-    h3 {
-      color: var(--ai-text-primary);
-    }
-    p {
-      color: var(--ai-text-secondary);
+    .extra-content {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid var(--ai-border);
     }
   }
 }

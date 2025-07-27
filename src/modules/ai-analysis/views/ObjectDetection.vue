@@ -1,23 +1,20 @@
 <template>
-  <div class="object-detection-page ai-gradient-bg">
-    <div class="page-header">
-      <div class="header-content">
-        <h1 class="page-title">
-          <el-icon><Aim /></el-icon>
-          智能目标检测
-        </h1>
-        <p class="page-subtitle">基于深度学习的实时目标识别与定位</p>
-      </div>
-      <div class="header-actions">
+  <div class="object-detection-page">
+    <PageHeader
+      title="智能目标检测"
+      subtitle="基于深度学习的实时目标识别与定位"
+      icon="Aim"
+    >
+      <template #actions>
         <el-button type="primary" :icon="List" @click="showHistory = !showHistory">
           {{ showHistory ? '返回检测' : '历史记录' }}
         </el-button>
-      </div>
-    </div>
+      </template>
+    </PageHeader>
 
     <!-- 主要检测区域 -->
     <div v-show="!showHistory" class="detection-area">
-      <AICard variant="glass" class="upload-section">
+      <AICard class="upload-section">
         <template #header>
           <div class="section-header">
             <h3>上传图像进行检测</h3>
@@ -38,293 +35,254 @@
         </template>
 
         <div class="upload-container">
-          <div class="image-upload-area"
-               :class="{ 'has-image': uploadedImage }"
-               @click="selectImage"
-               @dragover.prevent
-               @drop.prevent="handleDrop">
-            <div v-if="!uploadedImage" class="upload-placeholder">
-              <el-icon :size="60"><Upload /></el-icon>
-              <p>拖拽图片到此处或点击上传</p>
-              <p class="upload-hint">支持 JPG、PNG 格式，最大 10MB</p>
-            </div>
-            <div v-else class="image-preview">
-              <img :src="uploadedImage" alt="待检测图像" />
-              <canvas ref="detectionCanvas" class="detection-overlay"></canvas>
-              <el-button
-                  class="remove-btn"
-                  type="danger"
-                  :icon="Delete"
-                  circle
-                  @click.stop="removeImage"
+          <FileUpload
+            v-model="uploadedImage"
+            accept="image/*"
+            :show-file-list="false"
+            @change="handleImageUpload"
+          >
+            <template #trigger>
+              <div class="upload-placeholder" v-if="!uploadedImage">
+                <el-icon :size="60"><Upload /></el-icon>
+                <p>拖拽图片到此处或点击上传</p>
+                <p class="upload-hint">支持 JPG、PNG 格式，最大 10MB</p>
+              </div>
+            </template>
+          </FileUpload>
+
+          <div v-if="uploadedImage" class="image-preview">
+            <canvas ref="detectionCanvas" class="detection-canvas"></canvas>
+            <div class="image-controls">
+              <ActionBar
+                :actions="imageControls"
+                @action="handleImageAction"
               />
             </div>
-          </div>
-
-          <input
-              ref="fileInput"
-              type="file"
-              accept="image/*"
-              style="display: none"
-              @change="handleFileSelect"
-          />
-        </div>
-
-        <div class="detection-controls">
-          <div class="control-item">
-            <label>置信度阈值</label>
-            <el-slider
-                v-model="confidenceThreshold"
-                :min="0"
-                :max="100"
-                :step="5"
-                :format-tooltip="(val) => `${val}%`"
-            />
-          </div>
-          <div class="control-item">
-            <label>检测类别</label>
-            <el-select v-model="selectedCategories" multiple placeholder="全部类别">
-              <el-option
-                  v-for="category in categories"
-                  :key="category"
-                  :label="category"
-                  :value="category"
-              />
-            </el-select>
           </div>
         </div>
 
         <template #footer>
-          <el-button
+          <div class="detection-controls">
+            <el-button
               type="primary"
               size="large"
               :loading="detecting"
-              :disabled="!uploadedImage || !selectedModel"
+              :disabled="!uploadedImage"
               @click="startDetection"
-          >
-            <el-icon><MagicStick /></el-icon>
-            开始检测
-          </el-button>
+            >
+              <el-icon><MagicStick /></el-icon>
+              开始检测
+            </el-button>
+            <el-button
+              v-if="detectionResults"
+              type="success"
+              size="large"
+              @click="exportResults"
+            >
+              <el-icon><Download /></el-icon>
+              导出结果
+            </el-button>
+          </div>
         </template>
       </AICard>
 
       <!-- 检测结果 -->
-      <transition name="fade-slide">
-        <AICard v-if="detectionResults" variant="gradient" class="results-section">
-          <template #header>
-            <h3>检测结果</h3>
-            <el-tag type="success">检测完成</el-tag>
-          </template>
+      <AICard v-if="detectionResults" class="results-section">
+        <template #header>
+          <h3>检测结果</h3>
+          <el-tag type="success">检测完成</el-tag>
+        </template>
 
-          <div class="results-overview">
+        <div class="results-content">
+          <div class="results-stats">
             <MetricCard
-                label="检测到的目标"
-                :value="detectionResults.objects.length"
-                icon="Aim"
-                type="primary"
-            />
-            <MetricCard
-                label="平均置信度"
-                :value="averageConfidence"
-                icon="DataAnalysis"
-                type="success"
-                suffix="%"
-                :decimals="1"
-            />
-            <MetricCard
-                label="处理时间"
-                :value="detectionResults.processingTime"
-                icon="Timer"
-                type="info"
-                suffix="ms"
-            />
-            <MetricCard
-                label="类别数量"
-                :value="uniqueCategories"
-                icon="Grid"
-                type="warning"
+              v-for="stat in detectionStats"
+              :key="stat.title"
+              :title="stat.title"
+              :value="stat.value"
+              :icon="stat.icon"
+              :color="stat.color"
             />
           </div>
 
-          <div class="detection-details">
-            <h4>检测到的目标列表</h4>
-            <el-table :data="detectionResults.objects" style="width: 100%">
-              <el-table-column prop="id" label="ID" width="60" />
-              <el-table-column prop="category" label="类别">
-                <template #default="{ row }">
-                  <el-tag :type="getCategoryType(row.category)">
-                    {{ row.category }}
-                  </el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column prop="confidence" label="置信度">
-                <template #default="{ row }">
-                  <el-progress
-                      :percentage="row.confidence"
-                      :color="getConfidenceColor(row.confidence)"
-                  />
-                </template>
-              </el-table-column>
-              <el-table-column label="位置">
-                <template #default="{ row }">
-                  <span class="location-info">
-                    {{ `(${row.bbox.x}, ${row.bbox.y}) - ${row.bbox.width}×${row.bbox.height}` }}
-                  </span>
-                </template>
-              </el-table-column>
-              <el-table-column label="操作" width="100">
-                <template #default="{ row }">
-                  <el-button size="small" @click="highlightObject(row)">
-                    定位
-                  </el-button>
-                </template>
-              </el-table-column>
-            </el-table>
+          <div class="detected-objects">
+            <h4>检测到的对象</h4>
+            <DataTable
+              :data="detectionResults.objects"
+              :columns="objectColumns"
+              @row-click="highlightObject"
+            />
           </div>
-
-          <template #footer>
-            <el-button type="primary" @click="exportResults">
-              <el-icon><Download /></el-icon>
-              导出结果
-            </el-button>
-            <el-button @click="saveToHistory">
-              <el-icon><FolderAdd /></el-icon>
-              保存到历史
-            </el-button>
-          </template>
-        </AICard>
-      </transition>
+        </div>
+      </AICard>
     </div>
 
     <!-- 历史记录 -->
     <div v-show="showHistory" class="history-section">
-      <AICard variant="glass">
+      <AICard class="history-container">
         <template #header>
-          <h3>检测历史记录</h3>
+          <h3>检测历史</h3>
+          <el-button text @click="clearHistory">清空历史</el-button>
         </template>
 
-        <div class="history-grid">
+        <EmptyState
+          v-if="detectionHistory.length === 0"
+          icon="Clock"
+          title="暂无历史记录"
+          description="完成检测后会显示历史记录"
+        />
+
+        <div v-else class="history-grid">
           <div
-              v-for="item in historyItems"
-              :key="item.id"
-              class="history-item"
-              @click="loadHistoryItem(item)"
+            v-for="item in detectionHistory"
+            :key="item.id"
+            class="history-item"
+            @click="loadHistoryItem(item)"
           >
-            <div class="history-thumbnail">
-              <img :src="item.thumbnail" :alt="item.name" />
-              <div class="object-count">
-                <el-icon><Aim /></el-icon>
-                <span>{{ item.objectCount }}</span>
+            <div class="history-image">
+              <img :src="item.thumbnail" :alt="item.title" />
+              <div class="history-overlay">
+                <span class="object-count">{{ item.objectCount }} 个对象</span>
               </div>
             </div>
             <div class="history-info">
-              <h4>{{ item.name }}</h4>
-              <p>{{ item.model }}</p>
-              <span class="history-time">{{ formatTime(item.createdAt) }}</span>
+              <h5>{{ item.title }}</h5>
+              <p>{{ item.model }} - {{ formatTime(item.timestamp) }}</p>
             </div>
           </div>
         </div>
-
-        <el-empty v-if="historyItems.length === 0" description="暂无历史记录" />
       </AICard>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ref, computed, nextTick } from 'vue'
 import {
-  Aim, List, Upload, Delete, MagicStick, Download,
-  FolderAdd, Timer, DataAnalysis, Grid
+  Aim,
+  List,
+  Upload,
+  MagicStick,
+  Download,
+  Clock
 } from '@element-plus/icons-vue'
+import PageHeader from '@/modules/common/components/PageHeader.vue'
 import AICard from '@/modules/common/components/AICard.vue'
+import FileUpload from '@/modules/common/components/FileUpload.vue'
+import ActionBar from '@/modules/common/components/ActionBar.vue'
 import MetricCard from '@/modules/common/components/MetricCard.vue'
+import DataTable from '@/modules/common/components/DataTable.vue'
+import EmptyState from '@/modules/common/components/EmptyState.vue'
 
 // 响应式数据
 const showHistory = ref(false)
+const selectedModel = ref('yolo-v8')
 const uploadedImage = ref('')
-const fileInput = ref<HTMLInputElement>()
-const detectionCanvas = ref<HTMLCanvasElement>()
 const detecting = ref(false)
-const selectedModel = ref('yolov5')
-const confidenceThreshold = ref(50)
-const selectedCategories = ref<string[]>([])
 const detectionResults = ref<any>(null)
+const detectionHistory = ref<any[]>([])
+const detectionCanvas = ref<HTMLCanvasElement>()
 
-// 模拟数据
+// 检测模型
 const detectionModels = [
-  { id: 'yolov5', name: 'YOLOv5', description: '快速准确的实时检测' },
-  { id: 'yolov8', name: 'YOLOv8', description: '最新版本，性能更优' },
-  { id: 'rcnn', name: 'Faster R-CNN', description: '高精度检测' },
-  { id: 'ssd', name: 'SSD MobileNet', description: '轻量级移动端模型' }
-]
-
-const categories = [
-  'person', 'car', 'bicycle', 'motorcycle', 'bus', 'truck',
-  'cat', 'dog', 'horse', 'bird', 'bottle', 'chair'
-]
-
-const historyItems = ref([
   {
-    id: 1,
-    name: '街道场景检测',
-    thumbnail: '/placeholder.jpg',
-    model: 'YOLOv5',
-    objectCount: 15,
-    createdAt: new Date()
+    id: 'yolo-v8',
+    name: 'YOLO v8',
+    description: '高精度通用目标检测'
+  },
+  {
+    id: 'faster-rcnn',
+    name: 'Faster R-CNN',
+    description: '精确的两阶段检测'
+  },
+  {
+    id: 'ssd',
+    name: 'SSD MobileNet',
+    description: '轻量级实时检测'
   }
+]
+
+// 图像控制按钮
+const imageControls = computed(() => [
+  { label: '重新上传', icon: 'Upload', action: 'reupload' },
+  { label: '清除', icon: 'Delete', action: 'clear', type: 'danger' }
 ])
 
-// 计算属性
-const averageConfidence = computed(() => {
-  if (!detectionResults.value?.objects?.length) return 0
-  const sum = detectionResults.value.objects.reduce((acc: number, obj: any) => acc + obj.confidence, 0)
-  return sum / detectionResults.value.objects.length
+// 检测统计
+const detectionStats = computed(() => {
+  if (!detectionResults.value) return []
+
+  return [
+    {
+      title: '检测对象',
+      value: detectionResults.value.objects.length,
+      icon: 'Aim',
+      color: '#409eff'
+    },
+    {
+      title: '平均置信度',
+      value: `${detectionResults.value.avgConfidence}%`,
+      icon: 'TrendCharts',
+      color: '#67c23a'
+    },
+    {
+      title: '处理时间',
+      value: `${detectionResults.value.processTime}ms`,
+      icon: 'Timer',
+      color: '#e6a23c'
+    }
+  ]
 })
 
-const uniqueCategories = computed(() => {
-  if (!detectionResults.value?.objects) return 0
-  return new Set(detectionResults.value.objects.map((obj: any) => obj.category)).size
-})
+// 对象表格列
+const objectColumns = [
+  { prop: 'class', label: '类别', width: 120 },
+  { prop: 'confidence', label: '置信度', width: 100, formatter: (row: any) => `${row.confidence}%` },
+  { prop: 'bbox', label: '位置', formatter: (row: any) => `(${row.bbox.x}, ${row.bbox.y})` }
+]
 
 // 方法
-const selectImage = () => {
-  fileInput.value?.click()
-}
-
-const handleFileSelect = (e: Event) => {
-  const target = e.target as HTMLInputElement
-  const file = target.files?.[0]
+const handleImageUpload = (file: any) => {
   if (file) {
-    processFile(file)
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      uploadedImage.value = e.target?.result as string
+      detectionResults.value = null
+      nextTick(() => {
+        drawImageOnCanvas()
+      })
+    }
+    reader.readAsDataURL(file)
   }
 }
 
-const handleDrop = (e: DragEvent) => {
-  const file = e.dataTransfer?.files[0]
-  if (file && file.type.startsWith('image/')) {
-    processFile(file)
+const handleImageAction = (action: string) => {
+  switch (action) {
+    case 'reupload':
+      uploadedImage.value = ''
+      detectionResults.value = null
+      break
+    case 'clear':
+      uploadedImage.value = ''
+      detectionResults.value = null
+      break
   }
 }
 
-const processFile = (file: File) => {
-  if (file.size > 10 * 1024 * 1024) {
-    ElMessage.error('图片大小不能超过10MB')
-    return
+const drawImageOnCanvas = () => {
+  if (!detectionCanvas.value || !uploadedImage.value) return
+
+  const canvas = detectionCanvas.value
+  const ctx = canvas.getContext('2d')
+  const img = new Image()
+
+  img.onload = () => {
+    canvas.width = img.width
+    canvas.height = img.height
+    ctx?.drawImage(img, 0, 0)
   }
 
-  const reader = new FileReader()
-  reader.onload = (e) => {
-    uploadedImage.value = e.target?.result as string
-    detectionResults.value = null
-  }
-  reader.readAsDataURL(file)
-}
-
-const removeImage = () => {
-  uploadedImage.value = ''
-  detectionResults.value = null
+  img.src = uploadedImage.value
 }
 
 const startDetection = async () => {
@@ -332,55 +290,106 @@ const startDetection = async () => {
 
   // 模拟检测过程
   setTimeout(() => {
-    detectionResults.value = {
+    const mockResults = {
       objects: [
-        { id: 1, category: 'person', confidence: 95, bbox: { x: 100, y: 100, width: 80, height: 160 } },
-        { id: 2, category: 'car', confidence: 87, bbox: { x: 300, y: 200, width: 120, height: 80 } },
-        { id: 3, category: 'bicycle', confidence: 72, bbox: { x: 450, y: 150, width: 60, height: 40 } }
+        {
+          class: '人',
+          confidence: 95.2,
+          bbox: { x: 120, y: 80, width: 200, height: 300 }
+        },
+        {
+          class: '汽车',
+          confidence: 89.7,
+          bbox: { x: 350, y: 200, width: 180, height: 120 }
+        },
+        {
+          class: '树',
+          confidence: 76.3,
+          bbox: { x: 50, y: 150, width: 100, height: 200 }
+        }
       ],
-      processingTime: 156
+      avgConfidence: 87.1,
+      processTime: 342
     }
-    drawDetections()
+
+    detectionResults.value = mockResults
+    drawDetectionResults(mockResults)
+
+    // 添加到历史
+    detectionHistory.value.unshift({
+      id: Date.now(),
+      thumbnail: uploadedImage.value,
+      title: `检测结果 ${detectionHistory.value.length + 1}`,
+      model: detectionModels.find(m => m.id === selectedModel.value)?.name,
+      objectCount: mockResults.objects.length,
+      timestamp: new Date()
+    })
+
     detecting.value = false
     ElMessage.success('检测完成！')
   }, 2000)
 }
 
-const drawDetections = () => {
-  // 绘制检测框的逻辑
+const drawDetectionResults = (results: any) => {
+  if (!detectionCanvas.value) return
+
+  const canvas = detectionCanvas.value
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+
+  // 绘制检测框
+  ctx.strokeStyle = '#409eff'
+  ctx.lineWidth = 3
+  ctx.font = '16px Arial'
+  ctx.fillStyle = '#409eff'
+
+  results.objects.forEach((obj: any) => {
+    const { x, y, width, height } = obj.bbox
+
+    // 绘制边界框
+    ctx.strokeRect(x, y, width, height)
+
+    // 绘制标签
+    const label = `${obj.class} ${obj.confidence}%`
+    const textWidth = ctx.measureText(label).width
+    ctx.fillRect(x, y - 25, textWidth + 10, 25)
+    ctx.fillStyle = 'white'
+    ctx.fillText(label, x + 5, y - 8)
+    ctx.fillStyle = '#409eff'
+  })
 }
 
-const highlightObject = (object: any) => {
-  ElMessage.info(`定位到目标: ${object.category} (ID: ${object.id})`)
-}
-
-const getCategoryType = (category: string) => {
-  const types: Record<string, string> = {
-    person: 'primary',
-    car: 'success',
-    bicycle: 'warning',
-    default: 'info'
-  }
-  return types[category] || types.default
-}
-
-const getConfidenceColor = (confidence: number) => {
-  if (confidence >= 80) return '#10b981'
-  if (confidence >= 60) return '#f59e0b'
-  return '#ef4444'
+const highlightObject = (row: any) => {
+  // 高亮选中的对象
+  ElMessage.info(`选中对象: ${row.class}`)
 }
 
 const exportResults = () => {
-  ElMessage.success('检测结果已导出')
+  const data = {
+    image: uploadedImage.value,
+    results: detectionResults.value,
+    model: selectedModel.value,
+    timestamp: new Date()
+  }
+
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `detection-results-${Date.now()}.json`
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
-const saveToHistory = () => {
-  ElMessage.success('已保存到历史记录')
+const clearHistory = () => {
+  detectionHistory.value = []
+  ElMessage.success('历史已清空')
 }
 
 const loadHistoryItem = (item: any) => {
-  ElMessage.info(`加载历史记录: ${item.name}`)
+  uploadedImage.value = item.thumbnail
   showHistory.value = false
+  ElMessage.info(`加载历史项目: ${item.title}`)
 }
 
 const formatTime = (date: Date) => {
@@ -437,7 +446,7 @@ const formatTime = (date: Date) => {
 }
 
 .detection-area {
-  max-width: 1400px;
+  //max-width: 1400px;
   margin: 0 auto;
 
   .upload-section {

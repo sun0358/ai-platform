@@ -28,6 +28,7 @@ withDefaults(defineProps<Props>(), {
 
 <style lang="scss" scoped>
 .page-header {
+  width: 100%; // 添加100%宽度
   display: flex;
   justify-content: space-between;
   align-items: center;

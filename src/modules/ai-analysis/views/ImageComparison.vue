@@ -269,9 +269,13 @@ const loadModels = async () => {
 
 const handleImageUpload = (file: File | null, type: string) => {
   if (!file) {
+    // 删除图片时，同时清空 formData 和 images 状态
     formData.value[type as keyof typeof formData.value] = ''
+    delete images.value[type] // 删除对应的图片数据
     return
   }
+
+  // 上传新图片时，从 images 状态中获取 base64 数据
   const base64 = images.value[type]
   if (base64) {
     formData.value[type as keyof typeof formData.value] = base64.split(',')[1]
@@ -432,6 +436,7 @@ onUnmounted(() => { if (taskMonitoringTimer) clearInterval(taskMonitoringTimer) 
 
 <style lang="scss" scoped>
 @use '@/styles/ai-theme.scss';
+@use '@/styles/mixins' as mixins;
 
 // 渐变动画关键帧
 @keyframes gradient-shift {
@@ -487,7 +492,7 @@ onUnmounted(() => { if (taskMonitoringTimer) clearInterval(taskMonitoringTimer) 
 
   .create-view {
     .upload-card {
-      max-width: 1200px;
+      //max-width: 1400px;
       margin: 0 auto;
 
       .card-header-content {
@@ -545,7 +550,7 @@ onUnmounted(() => { if (taskMonitoringTimer) clearInterval(taskMonitoringTimer) 
 
       .upload-grid {
         display: grid;
-        grid-template-columns: 400px 1fr;
+        grid-template-columns: 2fr 3fr; // 实际图片占1/3，对比图片占2/3
         gap: 32px;
         align-items: center; // 添加垂直居中对齐
 
@@ -596,10 +601,46 @@ onUnmounted(() => { if (taskMonitoringTimer) clearInterval(taskMonitoringTimer) 
         .compare-grid {
           display: grid;
           grid-template-columns: repeat(2, 1fr);
-          gap: 16px;
+          gap: 20px; // 稍微增大间距
 
           @media (max-width: 768px) {
             grid-template-columns: 1fr;
+          }
+
+          .compare-item {
+            display: flex;
+            flex-direction: column;
+            padding: 16px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+
+            &:hover {
+              background: rgba(255, 255, 255, 0.05);
+              border-color: rgba(99, 102, 241, 0.3);
+            }
+
+            h5 {
+              margin: 0 0 12px 0;
+              font-size: 14px;
+              color: var(--ai-text-primary);
+              font-weight: 500;
+              display: flex;
+              align-items: center;
+              gap: 6px;
+
+              // 可以添加一个小图标
+              &::before {
+                content: '📍';
+                font-size: 12px;
+              }
+            }
+
+            .image-upload-ai {
+              flex: 1;
+              min-height: 150px; // 确保有最小高度
+            }
           }
         }
       }

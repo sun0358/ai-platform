@@ -60,7 +60,6 @@
               <div class="user-avatar">
                 <el-icon :size="24"><User /></el-icon>
               </div>
-              <div class="avatar-ring"></div>
             </div>
             <template #dropdown>
               <el-dropdown-menu class="modern-dropdown">
@@ -529,6 +528,19 @@ const handleCloseSettings = (done: () => void) => {
     .user-avatar-wrapper {
       position: relative;
       cursor: pointer;
+      width: 44px; /* 设定容器尺寸 */
+      height: 44px; /* 设定容器尺寸 */
+
+      /* 使用伪元素来创建光环 */
+      &::before {
+        content: '';
+        position: absolute;
+        inset: -3px; /* 控制光环的粗细 */
+        border-radius: 50%;
+        background: linear-gradient(135deg, #6366f1, #14b8a6);
+        animation: rotate 4s linear infinite;
+        z-index: -1; /* 将光环置于头像下方 */
+      }
 
       .user-avatar {
         width: 44px;
@@ -541,22 +553,6 @@ const handleCloseSettings = (done: () => void) => {
         color: white;
       }
 
-      .avatar-ring {
-        position: absolute;
-        inset: -3px;
-        border: 2px solid transparent;
-        border-radius: 50%;
-        background: linear-gradient(135deg, #6366f1, #14b8a6) border-box;
-        -webkit-mask:
-            linear-gradient(#fff 0 0) padding-box,
-            linear-gradient(#fff 0 0);
-        -webkit-mask-composite: xor;
-        mask:
-            linear-gradient(#fff 0 0) padding-box,
-            linear-gradient(#fff 0 0);
-        mask-composite: exclude;
-        animation: rotate 4s linear infinite;
-      }
       @keyframes rotate {
         from {
           transform: rotate(0deg);
@@ -690,6 +686,8 @@ const handleCloseSettings = (done: () => void) => {
   left: 50%;
   transform: translateX(-50%);
   background: rgba(255, 255, 255, 0.05);
+  width: max-content; /* 关键：让宽度由内容决定 */
+  max-width: 80vw;  /* 可选：防止菜单过长，超出视口 */
   backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 20px;
@@ -704,7 +702,7 @@ const handleCloseSettings = (done: () => void) => {
   }
 
   .submenu-grid {
-    display: grid;
+    display: flex;
     grid-template-columns: repeat(3, 1fr);
     gap: 12px;
 

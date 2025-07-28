@@ -30,7 +30,6 @@
             <div class="logo-orb">
               <el-icon :size="32"><DataAnalysis /></el-icon>
             </div>
-            <div class="logo-ring"></div>
           </div>
           <h2>欢迎回来</h2>
           <p>登录以继续使用AI平台</p>
@@ -136,8 +135,8 @@ const loading = ref(false)
 const rememberMe = ref(false)
 
 const form = reactive({
-  username: '',
-  password: ''
+  username: 'admin',
+  password: 'admin123'
 })
 
 const rules: FormRules = {
@@ -309,7 +308,7 @@ onMounted(() => {
 
         @for $i from 1 through 5 {
           &:nth-child(#{$i}) {
-            top: #{$i * 20}%;
+            top: $i * 20%;
             animation-delay: #{$i * 0.5}s;
           }
         }
@@ -357,6 +356,17 @@ onMounted(() => {
         height: 80px;
         margin: 0 auto 24px;
 
+        /* 使用伪元素来创建光环 */
+        &::before {
+          content: '';
+          position: absolute;
+          inset: -8px; /* 控制光环的粗细和间距 */
+          border-radius: 24px; /* 与logo-orb的圆角保持协调 */
+          background: linear-gradient(135deg, #6366f1, #14b8a6);
+          animation: rotate 4s linear infinite;
+          z-index: 0; /* 将光环置于logo-orb下方 */
+        }
+
         .logo-orb {
           width: 100%;
           height: 100%;
@@ -367,21 +377,15 @@ onMounted(() => {
           justify-content: center;
           color: white;
           position: relative;
-          z-index: 1;
+          z-index: 1; // 确保logo在光环之上
           animation: logo-float 3s ease-in-out infinite;
         }
+      }
 
-        .logo-ring {
-          position: absolute;
-          inset: -8px;
-          border: 2px solid transparent;
-          border-radius: 24px;
-          background: linear-gradient(135deg, #6366f1, #14b8a6) border-box;
-          -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
-          -webkit-mask-composite: xor;
-          mask-composite: exclude;
-          animation: rotate 4s linear infinite;
-        }
+      /* 确保动画定义存在 */
+      @keyframes rotate {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
       }
 
       h2 {

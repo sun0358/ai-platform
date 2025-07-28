@@ -2,6 +2,8 @@
 
 @use 'sass:map';  // 导入map模块
 @use './variables' as vars;
+@use 'sass:math';
+@use 'sass:color';
 
 // 清除浮动
 @mixin clearfix {
@@ -161,10 +163,11 @@
 
   &::-webkit-scrollbar-thumb {
     background: $thumb-color;
-    border-radius: $width / 2;
+    border-radius: math.div($width, 2);
+    border: 3px solid $track-color;
 
     &:hover {
-      background: darken($thumb-color, 10%);
+      background: color.adjust($thumb-color, $lightness: -10%);
     }
   }
 }

@@ -4,140 +4,162 @@
 -->
 
 <template>
-  <div class="yolo-training-container">
+  <div class="yolo-training-container ai-gradient-bg">
     <!-- 页面头部 -->
-    <div class="page-header">
-      <div class="header-content">
-        <h1>YOLO模型训练</h1>
-        <p>上传数据集，配置训练参数，训练YOLO目标检测模型</p>
-      </div>
-      <div class="header-actions">
-        <el-button @click="refreshData" :loading="refreshing">
+    <PageHeader
+        title="YOLO模型训练"
+        subtitle="上传数据集，配置训练参数，训练YOLO目标检测模型"
+        icon="Monitor"
+    >
+      <template #actions>
+        <el-button
+            type="primary"
+            class="ai-button-primary"
+            @click="refreshData"
+            :loading="refreshing"
+        >
           <el-icon><RefreshRight /></el-icon>
           刷新数据
         </el-button>
-      </div>
-    </div>
+      </template>
+    </PageHeader>
 
     <el-row :gutter="24">
       <!-- 左侧：训练配置和数据集管理 -->
       <el-col :span="16">
         <!-- 系统状态 -->
-        <el-card class="status-card" style="margin-bottom: 20px;">
-          <template #header>
-            <div class="card-header">
-              <span>Ubuntu训练服务状态</span>
-              <el-button text @click="checkSystemStatus" :loading="statusLoading">
-                <el-icon><Monitor /></el-icon>
-                检查状态
-              </el-button>
-            </div>
-          </template>
-
-          <div class="system-status">
-            <div class="status-grid">
-              <div class="status-item">
-                <div class="status-label">服务状态</div>
-                <el-tag :type="systemStatus.connected ? 'success' : 'danger'" size="large">
-                  {{ systemStatus.connected ? '已连接' : '连接失败' }}
-                </el-tag>
-              </div>
-              <div class="status-item" v-if="systemStatus.connected">
-                <div class="status-label">GPU状态</div>
-                <el-tag :type="systemStatus.gpu_available ? 'success' : 'warning'" size="large">
-                  {{ systemStatus.gpu_available ? '可用' : '不可用' }}
-                </el-tag>
-              </div>
-              <div class="status-item">
-                <div class="status-label">训练任务</div>
-                <span class="status-value">{{ statistics.training_tasks.total }}</span>
-              </div>
-              <div class="status-item">
-                <div class="status-label">可用模型</div>
-                <span class="status-value">{{ statistics.models.total }}</span>
-              </div>
-            </div>
-          </div>
-        </el-card>
+        <div class="animate-fade-slide" style="animation-delay: 0.1s;">
+          <StatsGroup
+              :stats="systemStats"
+              :icon-size="28"
+              style="margin-bottom: 24px;"
+          />
+        </div>
 
         <!-- 数据集管理 -->
-        <el-card class="dataset-card" style="margin-bottom: 20px;">
-          <template #header>
-            <div class="card-header">
-              <span>数据集管理</span>
-              <el-button type="primary" @click="showUploadDialog = true">
-                <el-icon><Upload /></el-icon>
-                上传数据集
-              </el-button>
-            </div>
+        <AICard
+            title="数据集管理"
+            icon="FolderOpened"
+            class="animate-fade-slide"
+            style="animation-delay: 0.2s; margin-bottom: 24px;"
+        >
+          <template #actions>
+            <el-button
+                type="primary"
+                class="ai-button-gradient"
+                @click="showUploadDialog = true"
+            >
+              <el-icon><Upload /></el-icon>
+              上传数据集
+            </el-button>
           </template>
 
           <div class="datasets-list">
-            <div v-if="datasets.length === 0" class="empty-state">
-              <el-empty description="暂无数据集">
-                <el-button type="primary" @click="showUploadDialog = true">
+            <EmptyState
+                v-if="datasets.length === 0"
+                icon="FolderRemove"
+                title="暂无数据集"
+                description="请上传您的第一个训练数据集"
+                :min-height="200"
+            >
+              <template #action>
+                <el-button
+                    type="primary"
+                    class="ai-button-gradient"
+                    @click="showUploadDialog = true"
+                >
                   上传第一个数据集
                 </el-button>
-              </el-empty>
-            </div>
-            <div v-else>
+              </template>
+            </EmptyState>
+
+            <div v-else class="dataset-grid">
               <div
                   v-for="dataset in datasets"
                   :key="dataset.dataset_id"
-                  class="dataset-item"
-                  :class="{ 'selected': selectedDataset?.dataset_id === dataset.dataset_id }"
+                  class="dataset-card glass-card"
+                  :class="{ 'dataset-card--selected': selectedDataset?.dataset_id === dataset.dataset_id }"
                   @click="selectDataset(dataset)"
               >
-                <div class="dataset-info">
-                  <div class="dataset-name">{{ dataset.name }}</div>
-                  <div class="dataset-details">
-                    <span>{{ dataset.num_classes }} 类别</span>
+                <div class="dataset-header">
+                  <h4 class="dataset-name">{{ dataset.name }}</h4>
+                  <el-tag
+                      :type="getDatasetStatusType(dataset.status)"
+                      size="small"
+                      effect="dark"
+                  >
+                    {{ getDatasetStatusText(dataset.status) }}
+                  </el-tag>
+                </div>
+
+                <div class="dataset-stats">
+                  <div class="stat-item">
+                    <el-icon><Picture /></el-icon>
                     <span>{{ dataset.total_images }} 图片</span>
-                    <el-tag :type="getDatasetStatusType(dataset.status)" size="small">
-                      {{ getDatasetStatusText(dataset.status) }}
-                    </el-tag>
                   </div>
-                  <div class="dataset-classes">
-                    <el-tag
-                        v-for="cls in dataset.classes.slice(0, 3)"
-                        :key="cls"
-                        size="small"
-                        style="margin-right: 4px;"
-                    >
-                      {{ cls }}
-                    </el-tag>
-                    <span v-if="dataset.classes.length > 3" class="more-classes">
-                      +{{ dataset.classes.length - 3 }}
-                    </span>
+                  <div class="stat-item">
+                    <el-icon><Collection /></el-icon>
+                    <span>{{ dataset.num_classes }} 类别</span>
                   </div>
                 </div>
+
+                <div class="dataset-classes">
+                  <el-tag
+                      v-for="cls in dataset.classes.slice(0, 3)"
+                      :key="cls"
+                      size="small"
+                      type="info"
+                      effect="plain"
+                  >
+                    {{ cls }}
+                  </el-tag>
+                  <span v-if="dataset.classes.length > 3" class="more-classes">
+                    +{{ dataset.classes.length - 3 }}
+                  </span>
+                </div>
+
                 <div class="dataset-actions">
-                  <el-button size="small" @click.stop="viewDatasetDetails(dataset)">
-                    详情
+                  <el-button
+                      size="small"
+                      type="primary"
+                      text
+                      @click.stop="viewDatasetDetails(dataset)"
+                  >
+                    查看详情
                   </el-button>
                 </div>
               </div>
             </div>
           </div>
-        </el-card>
+        </AICard>
 
         <!-- 训练配置 -->
-        <el-card class="config-card">
-          <template #header>
-            <div class="card-header">
-              <span>训练配置</span>
-              <el-button
-                  type="primary"
-                  :loading="isTraining"
-                  @click="startTraining"
-                  :disabled="!canStartTraining"
-              >
-                {{ isTraining ? '训练中...' : '开始训练' }}
-              </el-button>
-            </div>
+        <AICard
+            title="训练配置"
+            icon="Setting"
+            class="animate-fade-slide"
+            style="animation-delay: 0.3s;"
+        >
+          <template #actions>
+            <el-button
+                type="primary"
+                class="ai-button-gradient"
+                :loading="isTraining"
+                @click="startTraining"
+                :disabled="!canStartTraining"
+            >
+              <el-icon v-if="!isTraining"><VideoPlay /></el-icon>
+              {{ isTraining ? '训练中...' : '开始训练' }}
+            </el-button>
           </template>
 
-          <el-form :model="trainingConfig" label-width="120px" :rules="formRules" ref="configForm">
+          <el-form
+              :model="trainingConfig"
+              label-width="120px"
+              :rules="formRules"
+              ref="configForm"
+              class="ai-form"
+          >
             <!-- 数据集选择 -->
             <el-form-item label="选择数据集" prop="dataset_name">
               <el-select
@@ -152,10 +174,12 @@
                     :label="dataset.name"
                     :value="dataset.name"
                 >
-                  <span>{{ dataset.name }}</span>
-                  <span style="float: right; color: #8492a6; font-size: 13px;">
-                    {{ dataset.num_classes }}类 | {{ dataset.total_images }}图
-                  </span>
+                  <div class="option-content">
+                    <span>{{ dataset.name }}</span>
+                    <span class="option-meta">
+                      {{ dataset.num_classes }}类 | {{ dataset.total_images }}图
+                    </span>
+                  </div>
                 </el-option>
               </el-select>
             </el-form-item>
@@ -172,34 +196,15 @@
             <!-- 模型类型 -->
             <el-form-item label="模型类型" prop="model_type">
               <el-select v-model="trainingConfig.model_type" style="width: 100%;">
-                <el-option label="YOLOv8n (最快)" value="yolov8n">
-                  <div>
-                    <span>YOLOv8n</span>
-                    <div style="font-size: 12px; color: #909399;">最快速度，适合实时应用</div>
-                  </div>
-                </el-option>
-                <el-option label="YOLOv8s (平衡)" value="yolov8s">
-                  <div>
-                    <span>YOLOv8s</span>
-                    <div style="font-size: 12px; color: #909399;">速度与精度平衡</div>
-                  </div>
-                </el-option>
-                <el-option label="YOLOv8m (中等)" value="yolov8m">
-                  <div>
-                    <span>YOLOv8m</span>
-                    <div style="font-size: 12px; color: #909399;">中等大小，较好精度</div>
-                  </div>
-                </el-option>
-                <el-option label="YOLOv8l (较大)" value="yolov8l">
-                  <div>
-                    <span>YOLOv8l</span>
-                    <div style="font-size: 12px; color: #909399;">较大模型，高精度</div>
-                  </div>
-                </el-option>
-                <el-option label="YOLOv8x (最大)" value="yolov8x">
-                  <div>
-                    <span>YOLOv8x</span>
-                    <div style="font-size: 12px; color: #909399;">最大模型，最高精度</div>
+                <el-option
+                    v-for="model in modelOptions"
+                    :key="model.value"
+                    :label="model.label"
+                    :value="model.value"
+                >
+                  <div class="model-option">
+                    <span class="model-name">{{ model.label }}</span>
+                    <span class="model-desc">{{ model.description }}</span>
                   </div>
                 </el-option>
               </el-select>
@@ -252,109 +257,150 @@
               </el-col>
             </el-row>
           </el-form>
-        </el-card>
+        </AICard>
       </el-col>
 
       <!-- 右侧：训练任务和模型管理 -->
       <el-col :span="8">
         <!-- 训练任务 -->
-        <el-card class="tasks-card" style="margin-bottom: 20px;">
-          <template #header>
-            <div class="card-header">
-              <span>训练任务</span>
-              <el-badge :value="runningTasksCount" type="warning" :hidden="runningTasksCount === 0">
-                <el-button text @click="refreshTasks">
-                  <el-icon><List /></el-icon>
-                </el-button>
-              </el-badge>
-            </div>
+        <AICard
+            title="训练任务"
+            icon="List"
+            variant="gradient"
+            class="animate-fade-slide"
+            style="animation-delay: 0.4s; margin-bottom: 24px;"
+        >
+          <template #actions>
+            <el-badge :value="runningTasksCount" type="warning" :hidden="runningTasksCount === 0">
+              <el-button text @click="refreshTasks">
+                <el-icon><RefreshRight /></el-icon>
+              </el-button>
+            </el-badge>
           </template>
 
-          <div class="tasks-list">
-            <div v-if="trainingTasks.length === 0" class="empty-state">
-              <el-empty description="暂无训练任务" :image-size="80" />
-            </div>
-            <div v-else>
+          <div class="tasks-container">
+            <EmptyState
+                v-if="trainingTasks.length === 0"
+                icon="DocumentRemove"
+                description="暂无训练任务"
+                :min-height="150"
+            />
+
+            <div v-else class="task-list">
               <div
                   v-for="task in trainingTasks.slice(0, 5)"
                   :key="task.task_id"
-                  class="task-item"
-                  :class="{ 'active': task.status === 'running' }"
+                  class="task-item glass-item"
+                  :class="{ 'task-item--active': task.status === 'running' }"
               >
-                <div class="task-header">
-                  <span class="task-name">{{ task.task_name || '未命名项目' }}</span>
-                  <el-tag
-                      :type="YOLOUtils.getStatusType(task.status)"
-                      size="small"
-                  >
-                    {{ YOLOUtils.getStatusText(task.status) }}
-                  </el-tag>
-                </div>
-
-                <div class="task-details">
+                <div class="task-main">
+                  <h4 class="task-name">{{ task.task_name || '未命名项目' }}</h4>
                   <div class="task-time">{{ formatTime(task.created_at) }}</div>
                 </div>
 
-                <div class="task-actions">
-                  <el-button size="small" @click="viewTaskDetails(task)">
-                    详情
-                  </el-button>
-                  <el-button
-                      v-if="task.status === 'running'"
+                <div class="task-side">
+                  <el-tag
+                      :type="YOLOUtils.getStatusType(task.status)"
                       size="small"
-                      type="danger"
-                      @click="cancelTask(task)"
+                      effect="dark"
                   >
-                    取消
-                  </el-button>
+                    {{ YOLOUtils.getStatusText(task.status) }}
+                  </el-tag>
+
+                  <div class="task-actions">
+                    <el-button size="small" text @click="viewTaskDetails(task)">
+                      详情
+                    </el-button>
+                    <el-button
+                        v-if="task.status === 'running'"
+                        size="small"
+                        type="danger"
+                        text
+                        @click="cancelTask(task)"
+                    >
+                      取消
+                    </el-button>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </el-card>
+        </AICard>
 
         <!-- 可用模型 -->
-        <el-card class="models-card">
-          <template #header>
-            <div class="card-header">
-              <span>可用模型</span>
-              <el-button text @click="refreshModels">
-                <el-icon><Box /></el-icon>
-              </el-button>
-            </div>
+        <AICard
+            title="可用模型"
+            icon="Box"
+            variant="neon"
+            class="animate-fade-slide"
+            style="animation-delay: 0.5s;"
+        >
+          <template #actions>
+            <el-button text @click="refreshModels">
+              <el-icon><RefreshRight /></el-icon>
+            </el-button>
           </template>
 
-          <div class="models-list">
-            <div v-if="availableModels.length === 0" class="empty-state">
-              <el-empty description="暂无可用模型" :image-size="80" />
-            </div>
-            <div v-else>
+          <div class="models-container">
+            <EmptyState
+                v-if="availableModels.length === 0"
+                icon="Coin"
+                description="暂无可用模型"
+                :min-height="150"
+            />
+
+            <div v-else class="model-list">
               <div
                   v-for="model in availableModels.slice(0, 5)"
                   :key="model.model_id"
-                  class="model-item"
+                  class="model-item glass-item"
               >
-                <div class="model-header">
-                  <span class="model-name">{{ model.name }}</span>
-                  <el-tag size="small">{{ model.type }}</el-tag>
+                <div class="model-main">
+                  <h4 class="model-name">{{ model.name }}</h4>
+                  <div class="model-info">
+                    <el-tag size="small" effect="plain">{{ model.type }}</el-tag>
+                    <span class="model-time">{{ formatTime(model.created_at) }}</span>
+                  </div>
                 </div>
-                <div class="model-details">
-                  <div class="model-time">{{ formatTime(model.created_at) }}</div>
-                </div>
+
                 <div class="model-actions">
-                  <el-button size="small" @click="predictWithModel(model)">预测</el-button>
-                  <el-button size="small" @click="downloadModel(model)">下载</el-button>
+                  <el-button
+                      size="small"
+                      type="primary"
+                      text
+                      @click="predictWithModel(model)"
+                  >
+                    预测
+                  </el-button>
+                  <el-button
+                      size="small"
+                      text
+                      @click="downloadModel(model)"
+                  >
+                    下载
+                  </el-button>
                 </div>
               </div>
             </div>
           </div>
-        </el-card>
+        </AICard>
       </el-col>
     </el-row>
 
     <!-- 数据集上传对话框 -->
-    <el-dialog v-model="showUploadDialog" title="上传训练数据集" width="600px">
-      <el-form :model="uploadForm" label-width="100px" :rules="uploadRules" ref="uploadFormRef">
+    <el-dialog
+        v-model="showUploadDialog"
+        title="上传训练数据集"
+        width="600px"
+        class="ai-dialog"
+    >
+      <el-form
+          :model="uploadForm"
+          label-width="100px"
+          :rules="uploadRules"
+          ref="uploadFormRef"
+          class="ai-form"
+      >
         <el-form-item label="数据集名称" prop="name">
           <el-input v-model="uploadForm.name" placeholder="请输入数据集名称" />
         </el-form-item>
@@ -366,6 +412,8 @@
                 :key="index"
                 closable
                 @close="removeClass(index)"
+                type="info"
+                effect="dark"
                 style="margin-right: 8px; margin-bottom: 8px;"
             >
               {{ cls }}
@@ -379,7 +427,14 @@
                 @keyup.enter="handleInputConfirm"
                 @blur="handleInputConfirm"
             />
-            <el-button v-else size="small" @click="showInput">+ 添加类别</el-button>
+            <el-button
+                v-else
+                size="small"
+                class="button-new-tag"
+                @click="showInput"
+            >
+              + 添加类别
+            </el-button>
           </div>
         </el-form-item>
 
@@ -393,6 +448,7 @@
               multiple
               accept=".jpg,.jpeg,.png,.txt"
               drag
+              class="ai-upload"
           >
             <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
             <div class="el-upload__text">
@@ -408,66 +464,98 @@
       </el-form>
 
       <template #footer>
-        <el-button @click="showUploadDialog = false">取消</el-button>
-        <el-button
-            type="primary"
-            @click="uploadDataset"
-            :loading="uploading"
-        >
-          {{ uploading ? '上传中...' : '开始上传' }}
-        </el-button>
+        <div class="dialog-footer">
+          <el-button @click="showUploadDialog = false">取消</el-button>
+          <el-button
+              type="primary"
+              class="ai-button-gradient"
+              @click="uploadDataset"
+              :loading="uploading"
+          >
+            {{ uploading ? '上传中...' : '开始上传' }}
+          </el-button>
+        </div>
       </template>
     </el-dialog>
 
     <!-- 模型预测对话框 -->
-    <el-dialog v-model="predictDialogVisible" title="模型预测测试" width="600px">
+    <el-dialog
+        v-model="predictDialogVisible"
+        title="模型预测测试"
+        width="600px"
+        class="ai-dialog"
+    >
       <div class="predict-section">
-        <div class="predict-model-info">
-          <h4>使用模型: {{ currentModel?.name }}</h4>
+        <AICard variant="glass" :show-corner="false">
+          <div class="predict-model-info">
+            <el-icon><Cpu /></el-icon>
+            <span>使用模型: {{ currentModel?.name }}</span>
+          </div>
+        </AICard>
+
+        <div class="predict-upload">
+          <el-upload
+              ref="predictUpload"
+              :auto-upload="false"
+              :show-file-list="false"
+              accept="image/*"
+              :on-change="handleImageChange"
+              class="ai-upload-inline"
+          >
+            <el-button type="primary" class="ai-button-gradient">
+              <el-icon><Picture /></el-icon>
+              选择图片
+            </el-button>
+          </el-upload>
         </div>
 
-        <el-upload
-            ref="predictUpload"
-            :auto-upload="false"
-            :show-file-list="false"
-            accept="image/*"
-            :on-change="handleImageChange"
-        >
-          <el-button type="primary">选择图片</el-button>
-        </el-upload>
-
-        <div v-if="predictImage" class="image-preview">
+        <div v-if="predictImage" class="image-preview animate-fade-in">
           <img :src="predictImage" alt="预测图片" />
         </div>
 
-        <div v-if="predictResult" class="predict-result">
-          <h4>预测结果:</h4>
-          <div class="result-summary">
-            <span><strong>检测对象数:</strong> {{ predictResult.total_objects }}</span>
-          </div>
-          <div class="predictions-list">
-            <div
-                v-for="(pred, index) in predictResult.predictions"
-                :key="index"
-                class="prediction-item"
-            >
-              <span>类别ID: {{ pred.class_id }}</span>
-              <span>置信度: {{ (pred.confidence * 100).toFixed(1) }}%</span>
+        <div v-if="predictResult" class="predict-result animate-fade-slide">
+          <AICard variant="glass" :show-corner="false">
+            <h4>预测结果</h4>
+            <div class="result-summary">
+              <MetricCard
+                  label="检测对象"
+                  :value="predictResult.total_objects"
+                  icon="View"
+                  type="primary"
+                  style="margin-bottom: 16px;"
+              />
             </div>
-          </div>
+
+            <div class="predictions-grid">
+              <div
+                  v-for="(pred, index) in predictResult.predictions"
+                  :key="index"
+                  class="prediction-card"
+              >
+                <div class="pred-class">类别 {{ pred.class_id }}</div>
+                <div class="pred-confidence">
+                  <span class="confidence-value">{{ (pred.confidence * 100).toFixed(1) }}%</span>
+                  <span class="confidence-label">置信度</span>
+                </div>
+              </div>
+            </div>
+          </AICard>
         </div>
       </div>
 
       <template #footer>
-        <el-button @click="predictDialogVisible = false">关闭</el-button>
-        <el-button
-            type="primary"
-            @click="runPrediction"
-            :loading="isPredicting"
-            :disabled="!predictImageFile"
-        >
-          {{ isPredicting ? '预测中...' : '开始预测' }}
-        </el-button>
+        <div class="dialog-footer">
+          <el-button @click="predictDialogVisible = false">关闭</el-button>
+          <el-button
+              type="primary"
+              class="ai-button-gradient"
+              @click="runPrediction"
+              :loading="isPredicting"
+              :disabled="!predictImageFile"
+          >
+            {{ isPredicting ? '预测中...' : '开始预测' }}
+          </el-button>
+        </div>
       </template>
     </el-dialog>
   </div>
@@ -477,7 +565,9 @@
 import { ref, reactive, onMounted, computed, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  RefreshRight, Monitor, Upload, List, Box, UploadFilled
+  RefreshRight, Monitor, Upload, List, Box, UploadFilled,
+  FolderOpened, Setting, VideoPlay, Picture, Collection,
+  FolderRemove, DocumentRemove, Coin, Cpu, View
 } from '@element-plus/icons-vue'
 import {
   yoloTrainingApi,
@@ -488,6 +578,13 @@ import {
   type ModelInfo,
   type StatisticsResponse
 } from '../api'
+
+// 导入公共组件
+import PageHeader from '@/modules/common/components/PageHeader.vue'
+import AICard from '@/modules/common/components/AICard.vue'
+import StatsGroup from '@/modules/common/components/StatsGroup.vue'
+import EmptyState from '@/modules/common/components/EmptyState.vue'
+import MetricCard from '@/modules/common/components/MetricCard.vue'
 
 // 响应式数据
 const refreshing = ref(false)
@@ -553,6 +650,15 @@ const predictImage = ref('')
 const predictImageFile = ref<File | null>(null)
 const predictResult = ref(null)
 
+// 模型选项
+const modelOptions = [
+  { value: 'yolov8n', label: 'YOLOv8n', description: '最快速度，适合实时应用' },
+  { value: 'yolov8s', label: 'YOLOv8s', description: '速度与精度平衡' },
+  { value: 'yolov8m', label: 'YOLOv8m', description: '中等大小，较好精度' },
+  { value: 'yolov8l', label: 'YOLOv8l', description: '较大模型，高精度' },
+  { value: 'yolov8x', label: 'YOLOv8x', description: '最大模型，最高精度' }
+]
+
 // 表单验证规则
 const formRules = {
   dataset_name: [
@@ -592,6 +698,37 @@ const uploadRules = {
 }
 
 // 计算属性
+const systemStats = computed(() => {
+  return [
+    {
+      label: '服务状态',
+      value: systemStatus.value.connected ? '已连接' : '未连接',
+      icon: 'Monitor',
+      type: systemStatus.value.connected ? 'success' : 'danger',
+      animated: false
+    },
+    {
+      label: 'GPU状态',
+      value: systemStatus.value.gpu_available ? '可用' : '不可用',
+      icon: 'Cpu',
+      type: systemStatus.value.gpu_available ? 'success' : 'warning',
+      animated: false
+    },
+    {
+      label: '训练任务',
+      value: statistics.value.training_tasks.total,
+      icon: 'List',
+      type: 'primary'
+    },
+    {
+      label: '可用模型',
+      value: statistics.value.models.total,
+      icon: 'Box',
+      type: 'info'
+    }
+  ]
+})
+
 const canStartTraining = computed(() => {
   return trainingConfig.dataset_name &&
       trainingConfig.project_name &&
@@ -835,33 +972,44 @@ const getDatasetStatusText = (status: string) => {
 
 const viewDatasetDetails = (dataset: DatasetInfo) => {
   ElMessageBox.alert(
-      `<p><strong>数据集ID:</strong> ${dataset.dataset_id}</p>
-     <p><strong>名称:</strong> ${dataset.name}</p>
-     <p><strong>类别数:</strong> ${dataset.num_classes}</p>
-     <p><strong>图片数:</strong> ${dataset.total_images}</p>
-     <p><strong>状态:</strong> ${getDatasetStatusText(dataset.status)}</p>
-     <p><strong>类别列表:</strong> ${dataset.classes.join(', ')}</p>`,
+      `<div class="detail-content">
+        <p><strong>数据集ID:</strong> ${dataset.dataset_id}</p>
+        <p><strong>名称:</strong> ${dataset.name}</p>
+        <p><strong>类别数:</strong> ${dataset.num_classes}</p>
+        <p><strong>图片数:</strong> ${dataset.total_images}</p>
+        <p><strong>状态:</strong> ${getDatasetStatusText(dataset.status)}</p>
+        <p><strong>类别列表:</strong> ${dataset.classes.join(', ')}</p>
+      </div>`,
       '数据集详情',
-      { dangerouslyUseHTMLString: true }
+      {
+        dangerouslyUseHTMLString: true,
+        customClass: 'ai-message-box'
+      }
   )
 }
 
 const viewTaskDetails = (task: TrainingTaskInfo) => {
   ElMessageBox.alert(
-      `<p><strong>任务ID:</strong> ${task.task_id}</p>
-     <p><strong>任务名称:</strong> ${task.task_name}</p>
-     <p><strong>状态:</strong> ${YOLOUtils.getStatusText(task.status)}</p>
-     <p><strong>创建时间:</strong> ${formatTime(task.created_at)}</p>
-     <p><strong>完成时间:</strong> ${formatTime(task.completed_at) || '未完成'}</p>`,
+      `<div class="detail-content">
+        <p><strong>任务ID:</strong> ${task.task_id}</p>
+        <p><strong>任务名称:</strong> ${task.task_name}</p>
+        <p><strong>状态:</strong> ${YOLOUtils.getStatusText(task.status)}</p>
+        <p><strong>创建时间:</strong> ${formatTime(task.created_at)}</p>
+        <p><strong>完成时间:</strong> ${formatTime(task.completed_at) || '未完成'}</p>
+      </div>`,
       '任务详情',
-      { dangerouslyUseHTMLString: true }
+      {
+        dangerouslyUseHTMLString: true,
+        customClass: 'ai-message-box'
+      }
   )
 }
 
 const cancelTask = async (task: TrainingTaskInfo) => {
   try {
     await ElMessageBox.confirm('确定要取消这个训练任务吗？', '确认取消', {
-      type: 'warning'
+      type: 'warning',
+      customClass: 'ai-message-box'
     })
 
     ElMessage.info('任务取消功能开发中...')
@@ -889,240 +1037,390 @@ onMounted(() => {
 </script>
 
 <style scoped lang="scss">
+@use '@/styles/mixins' as mixins;
+@use '@/styles/animations.scss';
+
 .yolo-training-container {
   padding: 24px;
   min-height: 100vh;
-  background-color: #f5f7fa;
 }
 
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
-  padding: 20px;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+// 玻璃态卡片样式
+.glass-card {
+  @include mixins.glass-card;
+  padding: 16px;
+  margin-bottom: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
 
-  .header-content {
-    h1 {
-      margin: 0 0 8px 0;
-      font-size: 24px;
-      font-weight: 600;
-      color: #303133;
-    }
+  &:hover {
+    transform: translateY(-2px);
+    border-color: var(--ai-primary);
+    box-shadow: 0 8px 32px rgba(99, 102, 241, 0.2);
+  }
 
-    p {
-      margin: 0;
-      color: #606266;
-      font-size: 14px;
-    }
+  &--selected {
+    border-color: var(--ai-primary);
+    background: rgba(99, 102, 241, 0.1);
   }
 }
 
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-weight: 500;
-}
+.glass-item {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+  transition: all 0.3s ease;
 
-.system-status {
-  .status-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 16px;
-  }
-
-  .status-item {
-    text-align: center;
-    padding: 16px;
-    background: #f8f9ff;
-    border-radius: 6px;
-
-    .status-label {
-      font-size: 12px;
-      color: #909399;
-      margin-bottom: 8px;
-    }
-
-    .status-value {
-      font-size: 24px;
-      font-weight: 600;
-      color: #409eff;
-    }
+  &:hover {
+    background: rgba(255, 255, 255, 0.08);
+    transform: translateX(4px);
   }
 }
 
-.datasets-list {
-  .dataset-item {
+// 数据集卡片
+.dataset-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.dataset-card {
+  .dataset-header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    padding: 16px;
+    align-items: flex-start;
     margin-bottom: 12px;
-    border: 1px solid #e4e7ed;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.3s;
 
-    &:hover {
-      border-color: #409eff;
-      box-shadow: 0 2px 8px rgba(64, 158, 255, 0.1);
+    .dataset-name {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--ai-text-primary);
+    }
+  }
+
+  .dataset-stats {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 12px;
+
+    .stat-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 14px;
+      color: var(--ai-text-secondary);
+
+      .el-icon {
+        color: var(--ai-primary);
+      }
+    }
+  }
+
+  .dataset-classes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 12px;
+
+    .more-classes {
+      font-size: 12px;
+      color: var(--ai-text-muted);
+      line-height: 22px;
+    }
+  }
+
+  .dataset-actions {
+    display: flex;
+    justify-content: flex-end;
+  }
+}
+
+// 任务列表
+.task-list, .model-list {
+  max-height: 400px;
+  overflow-y: auto;
+  @include mixins.scrollbar(6px, transparent, rgba(255, 255, 255, 0.2));
+}
+
+.task-item {
+  &--active {
+    border-color: var(--ai-accent);
+    background: rgba(20, 184, 166, 0.1);
+
+    &::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 3px;
+      background: var(--ai-accent);
+      border-radius: 0 3px 3px 0;
+    }
+  }
+
+  .task-main {
+    flex: 1;
+
+    .task-name {
+      margin: 0 0 4px 0;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--ai-text-primary);
     }
 
-    &.selected {
-      border-color: #409eff;
-      background-color: #f0f9ff;
+    .task-time {
+      font-size: 12px;
+      color: var(--ai-text-muted);
+    }
+  }
+
+  .task-side {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+  }
+
+  .task-actions {
+    display: flex;
+    gap: 8px;
+  }
+}
+
+// 模型列表
+.model-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  .model-main {
+    flex: 1;
+
+    .model-name {
+      margin: 0 0 4px 0;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--ai-text-primary);
     }
 
-    .dataset-info {
-      flex: 1;
+    .model-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
 
-      .dataset-name {
-        font-weight: 500;
-        margin-bottom: 8px;
+      .model-time {
+        font-size: 12px;
+        color: var(--ai-text-muted);
       }
+    }
+  }
 
-      .dataset-details {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        margin-bottom: 8px;
-        font-size: 13px;
-        color: #606266;
-      }
+  .model-actions {
+    display: flex;
+    gap: 8px;
+  }
+}
 
-      .dataset-classes {
-        .more-classes {
-          font-size: 12px;
-          color: #909399;
+// 预测部分
+.predict-section {
+  .predict-model-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 16px;
+    color: var(--ai-primary);
+
+    .el-icon {
+      font-size: 20px;
+    }
+  }
+
+  .predict-upload {
+    margin: 20px 0;
+    text-align: center;
+  }
+
+  .image-preview {
+    text-align: center;
+    margin: 20px 0;
+
+    img {
+      max-width: 100%;
+      max-height: 300px;
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    }
+  }
+
+  .predict-result {
+    h4 {
+      margin: 0 0 16px 0;
+      color: var(--ai-text-primary);
+    }
+
+    .result-summary {
+      margin-bottom: 20px;
+    }
+
+    .predictions-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 12px;
+
+      .prediction-card {
+        @include mixins.glass-card;
+        padding: 16px;
+        text-align: center;
+
+        .pred-class {
+          font-size: 14px;
+          color: var(--ai-text-secondary);
+          margin-bottom: 8px;
+        }
+
+        .pred-confidence {
+          .confidence-value {
+            display: block;
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--ai-primary);
+          }
+
+          .confidence-label {
+            display: block;
+            font-size: 12px;
+            color: var(--ai-text-muted);
+          }
         }
       }
     }
   }
 }
 
-.tasks-list, .models-list {
-  max-height: 400px;
-  overflow-y: auto;
+// 表单选项样式
+.option-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
 
-  .task-item, .model-item {
-    padding: 12px;
-    margin-bottom: 8px;
-    border: 1px solid #e4e7ed;
-    border-radius: 6px;
-    transition: all 0.3s;
-
-    &:hover {
-      border-color: #409eff;
-      box-shadow: 0 2px 8px rgba(64, 158, 255, 0.1);
-    }
-
-    &.active {
-      border-color: #67c23a;
-      background-color: #f0f9ff;
-    }
-
-    .task-header, .model-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 8px;
-
-      .task-name, .model-name {
-        font-weight: 500;
-        font-size: 14px;
-      }
-    }
-
-    .task-details, .model-details {
-      margin: 8px 0;
-
-      .task-time, .model-time {
-        font-size: 12px;
-        color: #909399;
-      }
-    }
-
-    .task-actions, .model-actions {
-      display: flex;
-      gap: 8px;
-      margin-top: 8px;
-    }
+  .option-meta {
+    font-size: 12px;
+    color: var(--ai-text-muted);
   }
 }
 
+.model-option {
+  display: flex;
+  flex-direction: column;
+
+  .model-name {
+    font-weight: 500;
+  }
+
+  .model-desc {
+    font-size: 12px;
+    color: var(--ai-text-muted);
+    margin-top: 2px;
+  }
+}
+
+// 类别输入
 .classes-input {
   min-height: 60px;
   padding: 8px 0;
+
+  .button-new-tag {
+    border-style: dashed;
+  }
 }
 
-.predict-section {
-  .predict-model-info {
-    margin-bottom: 16px;
-    padding: 12px;
-    background: #f8f9ff;
-    border-radius: 6px;
+// 按钮样式
+.ai-button-gradient {
+  @include mixins.ai-button-gradient;
+}
 
-    h4 {
-      margin: 0;
-      color: #409eff;
+.ai-button-primary {
+  background: var(--ai-primary);
+  border-color: var(--ai-primary);
+
+  &:hover {
+    background: var(--ai-primary-light);
+    border-color: var(--ai-primary-light);
+  }
+}
+
+// 上传组件样式
+.ai-upload {
+  :deep(.el-upload-dragger) {
+    @include mixins.upload-area;
+    height: 180px;
+  }
+}
+
+.ai-upload-inline {
+  display: inline-block;
+}
+
+// 对话框样式
+.ai-dialog {
+  :deep(.el-dialog) {
+    background: var(--ai-bg-secondary);
+    border: 1px solid var(--ai-border);
+    border-radius: 16px;
+
+    .el-dialog__header {
+      border-bottom: 1px solid var(--ai-border);
+    }
+
+    .el-dialog__title {
+      color: var(--ai-text-primary);
+      font-weight: 600;
     }
   }
+}
 
-  .image-preview {
-    margin: 20px 0;
-    text-align: center;
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
 
-    img {
-      max-width: 100%;
-      max-height: 300px;
-      border-radius: 6px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    }
-  }
+// 消息框样式
+:global(.ai-message-box) {
+  .el-message-box {
+    background: var(--ai-bg-secondary);
+    border: 1px solid var(--ai-border);
 
-  .predict-result {
-    margin-top: 20px;
-    padding: 16px;
-    background-color: #f5f7fa;
-    border-radius: 6px;
-
-    h4 {
-      margin: 0 0 12px 0;
-      color: #303133;
+    .el-message-box__title {
+      color: var(--ai-text-primary);
     }
 
-    .result-summary {
-      margin-bottom: 12px;
-      font-weight: 500;
-    }
-
-    .predictions-list {
-      .prediction-item {
-        display: flex;
-        justify-content: space-between;
+    .detail-content {
+      p {
         margin: 8px 0;
-        padding: 8px 12px;
-        background-color: white;
-        border-radius: 4px;
-        font-size: 13px;
+        color: var(--ai-text-secondary);
+
+        strong {
+          color: var(--ai-text-primary);
+        }
       }
     }
   }
-}
-
-.empty-state {
-  padding: 40px 20px;
-  text-align: center;
 }
 
 // 响应式布局
 @media (max-width: 1200px) {
-  .status-grid {
-    grid-template-columns: repeat(2, 1fr);
+  .el-col-16 {
+    width: 100%;
+    margin-bottom: 24px;
+  }
+
+  .el-col-8 {
+    width: 100%;
   }
 }
 
@@ -1131,14 +1429,14 @@ onMounted(() => {
     padding: 16px;
   }
 
-  .page-header {
+  .dataset-stats {
     flex-direction: column;
     align-items: flex-start;
-    gap: 16px;
+    gap: 8px !important;
   }
 
-  .status-grid {
-    grid-template-columns: 1fr;
+  .predictions-grid {
+    grid-template-columns: 1fr !important;
   }
 }
 </style>

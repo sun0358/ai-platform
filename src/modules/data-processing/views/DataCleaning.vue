@@ -368,7 +368,7 @@
     </transition>
 
     <!-- 清洗规则对话框 -->
-    <el-dialog v-model="showRules" title="清洗规则管理" width="800px">
+    <el-dialog v-model="showRules" title="清洗规则管理" width="1200px">
       <div class="rules-management">
         <el-button type="primary" @click="addRule">
           <el-icon><Plus /></el-icon>
@@ -757,7 +757,7 @@ const deleteRule = (rule: any) => {
 }
 
 .quality-detection {
-  max-width: 1200px;
+  //max-width: 1200px;
   margin: 0 auto 32px;
 
   .detection-empty {
@@ -863,7 +863,7 @@ const deleteRule = (rule: any) => {
 }
 
 .cleaning-config {
-  max-width: 1200px;
+  //max-width: 1200px;
   margin: 0 auto 32px;
 
   h4 {
@@ -889,7 +889,7 @@ const deleteRule = (rule: any) => {
 }
 
 .cleaning-result {
-  max-width: 1200px;
+  //max-width: 1200px;
   margin: 0 auto;
   animation: fadeInUp 0.6s ease-out;
 

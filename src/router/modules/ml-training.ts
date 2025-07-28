@@ -13,6 +13,15 @@ const mlTrainingRoutes: RouteRecordRaw[] = [
                 redirect: '/ml-training/create'
             },
             {
+                path: 'yolo',
+                name: 'YOLOTraining',
+                component: () => import('@/modules/ml-training/views/YOLOTraining.vue'),
+                meta: {
+                    title: 'YOLO训练',
+                    icon: 'view'
+                }
+            },
+            {
                 path: 'create',
                 name: 'MLTrainingCreate',
                 component: () => import('@/modules/ml-training/views/CreateTraining.vue'),

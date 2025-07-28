@@ -385,8 +385,9 @@ const viewInsightDetail = (insight: any) => {
 </script>
 
 <style lang="scss" scoped>
-@import '@/styles/mixins.scss';
-@import '@/styles/animations.scss';
+@use '@/styles/mixins.scss';
+@use '@/styles/animations.scss';
+@use '@/styles/ai-theme.scss';  // 添加这行
 
 .excel-analysis-page {
   padding: 24px;
@@ -396,15 +397,12 @@ const viewInsightDetail = (insight: any) => {
 
   .upload-section {
     margin-bottom: 24px;
-    @include fade-slide;
+    @include mixins.fade-slide;
 
     .analysis-options {
+      @include mixins.glass-card;  // 使用玻璃卡片 mixin
       margin-top: 24px;
       padding: 20px;
-      background: var(--ai-glass-bg);
-      border: 1px solid var(--ai-glass-border);
-      border-radius: 12px;
-      backdrop-filter: blur(10px);
 
       h4 {
         margin: 0 0 16px 0;
@@ -431,14 +429,14 @@ const viewInsightDetail = (insight: any) => {
         }
 
         :deep(.el-button--primary) {
-          @include ai-button;
+          @include mixins.ai-button-gradient;
         }
       }
     }
   }
 
   .results-section {
-    @include fade-slide;
+    @include mixins.fade-slide;
 
     .result-actions {
       display: flex;
@@ -448,9 +446,7 @@ const viewInsightDetail = (insight: any) => {
       padding: 16px 0;
 
       .el-button {
-        background: var(--ai-glass-bg);
-        border: 1px solid var(--ai-border);
-        color: var(--ai-text-primary);
+        @include mixins.ai-button-gradient;
 
         &:hover {
           background: var(--ai-glass-bg);
@@ -465,14 +461,12 @@ const viewInsightDetail = (insight: any) => {
 
       .ai-insights {
         .insight-item {
+          @include mixins.glass-card;  // 使用 glass-card mixin
           display: flex;
           align-items: center;
           gap: 16px;
           padding: 16px;
           margin-bottom: 16px;
-          background: var(--ai-glass-bg);
-          border: 1px solid var(--ai-glass-border);
-          border-radius: 12px;
           transition: all 0.3s ease;
 
           &:hover {
@@ -546,14 +540,12 @@ const viewInsightDetail = (insight: any) => {
 
   .template-list {
     .template-item {
+      @include mixins.ai-card-base;  // 使用卡片基础 mixin
       display: flex;
       align-items: center;
       gap: 16px;
       padding: 16px;
       margin-bottom: 12px;
-      background: var(--ai-glass-bg);
-      border: 1px solid var(--ai-border);
-      border-radius: 12px;
       cursor: pointer;
       transition: all 0.3s ease;
 

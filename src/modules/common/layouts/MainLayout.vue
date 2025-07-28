@@ -230,7 +230,8 @@ const navItems = [
     children: [
       { path: '/ml-training/create', title: '创建训练', icon: 'Plus' },
       { path: '/ml-training/tasks', title: '任务管理', icon: 'List' },
-      { path: '/ml-training/models', title: '模型仓库', icon: 'Box' }
+      { path: '/ml-training/models', title: '模型仓库', icon: 'Box' },
+      {path: '/ml-training/yolo', title: 'YOLO训练', icon: 'view' }
     ]
   }
 ]

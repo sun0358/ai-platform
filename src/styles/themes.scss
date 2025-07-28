@@ -2,4 +2,4 @@
 // 此文件已合并到 ai-theme.scss 中，避免重复定义
 
 // 导入统一的主题配置
-@import './ai-theme.scss';
+@use './ai-theme.scss';

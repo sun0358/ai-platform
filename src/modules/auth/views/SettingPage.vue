@@ -863,6 +863,8 @@ const disconnectIntegration = async (integration: any) => {
 
 <style lang="scss" scoped>
 @use '@/styles/ai-theme.scss';
+// 导入表单样式
+@use '@/styles/forms.scss';
 
 .settings-page {
   min-height: 100vh;
@@ -1084,8 +1086,6 @@ const disconnectIntegration = async (integration: any) => {
   }
 }
 
-// 导入表单样式
-@import '@/styles/forms.scss';
 
 // 主题适配
 :deep(.el-table) {

@@ -672,6 +672,8 @@ const resetPreferences = () => {
 
 <style lang="scss" scoped>
 @use '@/styles/ai-theme.scss';
+// 导入表单样式
+@use '@/styles/forms.scss';
 
 .profile-page {
   min-height: 100vh;
@@ -980,6 +982,5 @@ const resetPreferences = () => {
   }
 }
 
-// 导入表单样式
-@import '@/styles/forms.scss';
+
 </style>
